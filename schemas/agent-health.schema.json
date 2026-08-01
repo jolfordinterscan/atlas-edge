@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "atlas-edge/schemas/agent-health.schema.json",
+  "title": "Agent Health Event Schema Placeholder",
+  "description": "Placeholder schema for agent.health. TODO: finalize fields from approved minimum contract.",
+  "$comment": "TODO: Define envelope and payload details during contract finalization.",
+  "type": "object"
+}

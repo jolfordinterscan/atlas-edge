@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "atlas-edge/schemas/scanner-inventory.schema.json",
+  "title": "Scanner Inventory Event Schema Placeholder",
+  "description": "Placeholder schema for scanner.inventory. TODO: finalize fields from approved minimum contract.",
+  "$comment": "TODO: Define envelope and payload details during contract finalization.",
+  "type": "object"
+}

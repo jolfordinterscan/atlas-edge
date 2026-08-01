@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "atlas-edge/schemas/scan-pages-recorded.schema.json",
+  "title": "Scan Pages Recorded Event Schema Placeholder",
+  "description": "Placeholder schema for scan.pages.recorded. TODO: finalize fields from approved minimum contract.",
+  "$comment": "TODO: Define envelope and payload details during contract finalization.",
+  "type": "object"
+}

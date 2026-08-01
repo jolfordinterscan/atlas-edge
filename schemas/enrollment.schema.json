@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "atlas-edge/schemas/enrollment.schema.json",
+  "title": "Enrollment Contract Schema Placeholder",
+  "description": "Placeholder schema for enrollment. TODO: finalize fields from approved minimum contract.",
+  "$comment": "TODO: Define enrollment request/response details during contract finalization.",
+  "type": "object"
+}

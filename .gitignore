@@ -1,0 +1,33 @@
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Editor and IDE
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/tasks.json
+
+# Build outputs
+bin/
+obj/
+out/
+dist/
+build/
+
+# Logs and temp
+*.log
+*.tmp
+*.temp
+
+# Coverage and reports
+coverage/
+TestResults/
+
+# Node-related (if tooling is introduced)
+node_modules/
+
+# Python-related (if tooling is introduced)
+__pycache__/
+*.pyc
