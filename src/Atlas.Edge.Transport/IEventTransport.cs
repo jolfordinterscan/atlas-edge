@@ -4,5 +4,7 @@ namespace Atlas.Edge.Transport;
 
 public interface IEventTransport
 {
-    Task SendAsync(IReadOnlyList<QueueItem<AgentHeartbeatEvent>> batch, CancellationToken cancellationToken);
+    Task<TransportSendResult> SendAsync(
+        IReadOnlyList<QueueItem<AgentHeartbeatEvent>> batch,
+        CancellationToken cancellationToken);
 }

@@ -34,13 +34,12 @@ Scanner or Capture Application
 
 ## Current Stage
 
-This repository now includes a .NET 8 Windows runtime foundation checkpoint.
-The runtime supports configuration validation, temporary development identity creation, heartbeat generation, in-memory queueing, null transport delivery, structured logging, and graceful shutdown.
+This repository now includes a .NET 8 runtime checkpoint for local secure enrollment and authenticated outbound delivery.
+The runtime supports configuration validation, one-time enrollment against a local HTTPS mock API, protected local development credential storage on macOS, heartbeat generation, in-memory queueing, authenticated HTTP batch send, retry classification, and graceful shutdown.
 
 The following remain intentionally unimplemented at this checkpoint:
 
-- Enrollment
-- Secure per-device production identity
-- Real Atlas HTTPS transport
+- Live Atlas Platform integration
+- Secure per-device production storage for Windows
 - Scanner discovery
 - Page-count collection

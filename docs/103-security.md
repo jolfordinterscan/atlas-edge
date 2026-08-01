@@ -21,6 +21,16 @@
 - Credentials are tenant and device scoped
 - Revocation and rotation are first-class behaviors
 
+## Current Implementation Notes
+
+- Secure enrollment and authenticated outbound transport are implemented against a local HTTPS mock API only.
+- No production Atlas credential paths are implemented in this checkpoint.
+- macOS uses a protected local development credential store with encrypted-at-rest payloads.
+- Windows protected credential storage is still a required gap before pilot release.
+- No plaintext credentials are committed to source.
+- Secret redaction helpers are used for log-safe token fingerprints only.
+- Runtime does not expose any inbound listener.
+
 ## Logging And Privacy
 
 - Logs must avoid raw secrets and credentials

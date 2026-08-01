@@ -26,8 +26,10 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Atlas.Edge.Configuration\Atlas.Edge.Configuration.csproj" />
     <ProjectReference Include="..\..\src\Atlas.Edge.Core\Atlas.Edge.Core.csproj" />
+    <ProjectReference Include="..\..\src\Atlas.Edge.Enrollment\Atlas.Edge.Enrollment.csproj" />
     <ProjectReference Include="..\..\src\Atlas.Edge.Queue\Atlas.Edge.Queue.csproj" />
     <ProjectReference Include="..\..\src\Atlas.Edge.Runtime\Atlas.Edge.Runtime.csproj" />
+    <ProjectReference Include="..\..\src\Atlas.Edge.Security\Atlas.Edge.Security.csproj" />
     <ProjectReference Include="..\..\src\Atlas.Edge.Telemetry\Atlas.Edge.Telemetry.csproj" />
     <ProjectReference Include="..\..\src\Atlas.Edge.Transport\Atlas.Edge.Transport.csproj" />
   </ItemGroup>

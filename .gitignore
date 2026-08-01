@@ -4,10 +4,7 @@ Thumbs.db
 
 # Editor and IDE
 .idea/
-.vscode/*
-!.vscode/settings.json
-!.vscode/extensions.json
-!.vscode/tasks.json
+.vscode/
 
 # Build outputs
 bin/

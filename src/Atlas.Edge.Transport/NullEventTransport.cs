@@ -12,7 +12,9 @@ public sealed class NullEventTransport : IEventTransport
         _logger = logger;
     }
 
-    public Task SendAsync(IReadOnlyList<QueueItem<AgentHeartbeatEvent>> batch, CancellationToken cancellationToken)
+    public Task<TransportSendResult> SendAsync(
+        IReadOnlyList<QueueItem<AgentHeartbeatEvent>> batch,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -25,6 +27,6 @@ public sealed class NullEventTransport : IEventTransport
                 item.Payload.AgentId);
         }
 
-        return Task.CompletedTask;
+        return Task.FromResult(TransportSendResult.Success(batch.Select(item => item.Payload.EventId)));
     }
 }
