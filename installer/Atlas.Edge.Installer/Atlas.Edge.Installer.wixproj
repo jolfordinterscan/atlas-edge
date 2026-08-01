@@ -1,0 +1,18 @@
+<Project Sdk="WixToolset.Sdk/4.0.5">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <Platform>x64</Platform>
+    <Cultures>en-US</Cultures>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">0.6.0</ProductVersion>
+    <RuntimePayloadFile Condition="'$(RuntimePayloadFile)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\installer\staging\RuntimePayload.wxs</RuntimePayloadFile>
+    <BrandAssetsDir Condition="'$(BrandAssetsDir)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\installer\staging\branding</BrandAssetsDir>
+    <RuntimePublishDir Condition="'$(RuntimePublishDir)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\installer\staging\runtime</RuntimePublishDir>
+    <InstallerRoot Condition="'$(InstallerRoot)' == ''">$(MSBuildThisFileDirectory)..</InstallerRoot>
+    <DefineConstants>ProductVersion=$(ProductVersion);BrandAssetsDir=$(BrandAssetsDir);RuntimePublishDir=$(RuntimePublishDir);InstallerRoot=$(InstallerRoot)</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="4.0.5" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="4.0.5" />
+    <Compile Include="$(RuntimePayloadFile)" Link="RuntimePayload.wxs" />
+  </ItemGroup>
+</Project>

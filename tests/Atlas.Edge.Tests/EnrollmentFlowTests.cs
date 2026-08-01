@@ -167,7 +167,9 @@ public sealed class EnrollmentFlowTests
                 "\"site_timezone\":\"UTC\"," +
                 "\"access_token\":\"token-123\"," +
                 "\"refresh_token\":\"refresh-token-placeholder\"," +
-                "\"credential_expiry_utc\":\"2030-01-01T00:00:00Z\"" +
+                "\"credential_expiry_utc\":\"2030-01-01T00:00:00Z\"," +
+                "\"refresh_token_expiry_utc\":\"2030-02-01T00:00:00Z\"," +
+                "\"token_refresh_url\":\"https://localhost:7143/api/edge/v1/token/refresh\"" +
                 "}";
 
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)

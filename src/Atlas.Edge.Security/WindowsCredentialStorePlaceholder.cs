@@ -13,4 +13,10 @@ public sealed class WindowsCredentialStorePlaceholder : ICredentialStore
         cancellationToken.ThrowIfCancellationRequested();
         throw new PlatformNotSupportedException("Windows protected credential storage is not implemented yet.");
     }
+
+    public Task DeleteAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        throw new PlatformNotSupportedException("Windows protected credential storage is not implemented yet.");
+    }
 }

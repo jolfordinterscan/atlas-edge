@@ -35,11 +35,17 @@ Scanner or Capture Application
 ## Current Stage
 
 This repository now includes a .NET 8 runtime checkpoint for local secure enrollment and authenticated outbound delivery.
-The runtime supports configuration validation, one-time enrollment against a local HTTPS mock API, protected local development credential storage on macOS, heartbeat generation, in-memory queueing, authenticated HTTP batch send, retry classification, and graceful shutdown.
+The runtime supports configuration validation, one-time enrollment against a local HTTPS mock API, protected local development credential storage on macOS, proactive single-flight token refresh, rotated credential persistence, read-only scanner inventory discovery and health collection, heartbeat generation, in-memory queueing, authenticated HTTP batch send, retry classification, and graceful shutdown.
+
+Scanner discovery is isolated in `Atlas.Edge.ScannerDiscovery`. WIA is the default real Windows provider and enumerates scanner-class metadata only on a dedicated STA thread. Provider calls have bounded timeouts and isolated failure codes. Stable identity prefers provider identity, then manufacturer/model plus serial, then a hashed device path, then deterministic bounded metadata. Records with the same manufacturer and serial number may merge across providers; matching model names alone never merge. Unknown capability and status evidence remains unknown.
+
+`ScannerDiscoveryHostedService` runs independently from heartbeat generation, updates immutable local inventory state, and creates a versioned `scanner.inventory` event only when the deterministic snapshot fingerprint changes. The existing in-memory queue keeps exactly one latest local inventory event in a separate coalesced slot. Heartbeat batching cannot see that slot, so the current Platform limitation to `agent.heartbeat` cannot block or poison heartbeat delivery. No scanner inventory is transmitted at this checkpoint.
+
+Scanner health is isolated in `Atlas.Edge.ScannerHealth`. Providers consume read-only source metadata and publish normalized immutable startup snapshots. Unknown values remain unknown. Mechanical, reliability, performance, connectivity, and overall scores are calculated only when their required evidence is available. Health snapshots remain local and are not queued or transmitted.
 
 The following remain intentionally unimplemented at this checkpoint:
 
 - Live Atlas Platform integration
 - Secure per-device production storage for Windows
-- Scanner discovery
-- Page-count collection
+- Scanner health telemetry transmission
+- Prediction and automated remediation

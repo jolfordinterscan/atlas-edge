@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Atlas.Edge.Core\Atlas.Edge.Core.csproj" />
+    <ProjectReference Include="..\Atlas.Edge.Security\Atlas.Edge.Security.csproj" />
   </ItemGroup>
 
   <ItemGroup>

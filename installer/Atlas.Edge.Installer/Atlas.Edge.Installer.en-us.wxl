@@ -1,0 +1,6 @@
+<WixLocalization xmlns="http://wixtoolset.org/schemas/v4/wxl" Culture="en-US">
+  <String Id="WelcomeDlgTitle" Value="{\WixUI_Font_Bigger}Atlas Edge" Overridable="yes" />
+  <String Id="WelcomeDlgDescription" Value="Enterprise Scanner Intelligence&#xD;&#xA;&#xD;&#xA;Publisher: InterScan&#xD;&#xA;&#xD;&#xA;Install Atlas Edge to monitor scanner health, discovery, evidence, and operational status on this computer." Overridable="yes" />
+  <String Id="LicenseAgreementDlgLicenseAcceptedCheckBox" Value="I &amp;accept the terms of the License Agreement" Overridable="yes" />
+  <String Id="ExitDialogTitle" Value="{\WixUI_Font_Bigger}Atlas Edge has been successfully installed." Overridable="yes" />
+</WixLocalization>

@@ -5,4 +5,6 @@ public interface ICredentialStore
     Task<StoredEdgeCredentials?> LoadAsync(CancellationToken cancellationToken);
 
     Task SaveAsync(StoredEdgeCredentials credentials, CancellationToken cancellationToken);
+
+    Task DeleteAsync(CancellationToken cancellationToken);
 }

@@ -9,5 +9,8 @@ public sealed record StoredEdgeCredentials(
     string SiteTimezone,
     string AccessToken,
     string RefreshToken,
-    DateTimeOffset CredentialExpiryUtc,
+    DateTimeOffset AccessTokenExpiryUtc,
+    DateTimeOffset RefreshTokenExpiryUtc,
+    string RefreshUrl,
+    long Generation,
     DateTimeOffset StoredAtUtc);

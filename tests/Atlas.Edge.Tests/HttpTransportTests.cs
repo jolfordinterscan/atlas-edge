@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using Atlas.Edge.Core;
+using Atlas.Edge.Security;
 using Atlas.Edge.Transport;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -45,7 +46,7 @@ public sealed class HttpTransportTests
         var result = await transport.SendAsync(new[] { CreateItem(Guid.NewGuid().ToString("N")) }, CancellationToken.None);
 
         Assert.False(result.IsSuccess);
-        Assert.Equal(TransportFailureKind.NonRetryable, result.FailureKind);
+        Assert.Equal(TransportFailureKind.AuthenticationRequired, result.FailureKind);
     }
 
     [Fact]
@@ -90,7 +91,7 @@ public sealed class HttpTransportTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal(TransportFailureKind.NonRetryable, result.FailureKind);
-        Assert.Contains("HTTPS", result.Error, StringComparison.Ordinal);
+        Assert.Equal("https_required", result.Error);
     }
 
     [Fact]
@@ -190,8 +191,39 @@ public sealed class HttpTransportTests
             _ingestionUrl = ingestionUrl;
         }
 
-        public TransportCredentialContext? GetCurrent() =>
-            new(_ingestionUrl, "agent-1", "tenant-a", "token-123");
+        public CredentialLifecycleState State => CredentialLifecycleState.Active;
+
+        public ValueTask<CredentialLeaseResult> GetLeaseAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult(CredentialLeaseResult.Available(CreateLease(generation: 1)));
+
+        public ValueTask<CredentialLeaseResult> RefreshAfterAccessTokenExpiredAsync(
+            long rejectedGeneration,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromResult(CredentialLeaseResult.Available(CreateLease(generation: rejectedGeneration + 1)));
+
+        public ValueTask<CredentialLeaseResult> InvalidateAfterAuthenticationFailureAsync(
+            long rejectedGeneration,
+            string errorCode,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromResult(CredentialLeaseResult.Unavailable(
+                CredentialAvailabilityKind.AuthenticationRequired,
+                errorCode));
+
+        private CredentialLease CreateLease(long generation) =>
+            new(
+                "agent-1",
+                "device-1",
+                "tenant-a",
+                _ingestionUrl,
+                "UTC",
+                "token-123",
+                "refresh-123",
+                DateTimeOffset.UtcNow.AddHours(1),
+                DateTimeOffset.UtcNow.AddDays(1),
+                "https://localhost:7143/api/edge/v1/token/refresh",
+                generation,
+                "Test",
+                DateTimeOffset.UtcNow);
     }
 
     private sealed class FakeHandler : HttpMessageHandler

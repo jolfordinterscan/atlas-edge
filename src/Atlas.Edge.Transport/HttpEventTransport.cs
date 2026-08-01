@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Atlas.Edge.Core;
+using Atlas.Edge.Security;
 using Microsoft.Extensions.Logging;
 
 namespace Atlas.Edge.Transport;
@@ -39,31 +40,55 @@ public sealed class HttpEventTransport : IEventTransport
             return TransportSendResult.Success(Array.Empty<string>());
         }
 
-        var context = _credentialProvider.GetCurrent();
-        if (context is null)
+        var leaseResult = await _credentialProvider.GetLeaseAsync(cancellationToken);
+        if (leaseResult.Lease is null)
         {
-            return TransportSendResult.Retryable("No transport credential context is available.");
+            return MapCredentialFailure(leaseResult);
         }
 
-        if (!Uri.TryCreate(context.IngestionUrl, UriKind.Absolute, out var endpoint))
+        var firstAttempt = await SendOnceAsync(batch, leaseResult.Lease, cancellationToken);
+        if (!firstAttempt.AccessTokenExpired)
         {
-            return TransportSendResult.NonRetryable("Transport endpoint is not a valid absolute URI.");
+            return firstAttempt.Result;
+        }
+
+        var refreshed = await _credentialProvider.RefreshAfterAccessTokenExpiredAsync(
+            leaseResult.Lease.Generation,
+            cancellationToken);
+        if (refreshed.Lease is null)
+        {
+            return MapCredentialFailure(refreshed);
+        }
+
+        var replay = await SendOnceAsync(batch, refreshed.Lease, cancellationToken);
+        return replay.AccessTokenExpired
+            ? TransportSendResult.Retryable("access_token_expired_after_refresh")
+            : replay.Result;
+    }
+
+    private async Task<SendAttempt> SendOnceAsync(
+        IReadOnlyList<QueueItem<AgentHeartbeatEvent>> batch,
+        CredentialLease lease,
+        CancellationToken cancellationToken)
+    {
+        if (!Uri.TryCreate(lease.IngestionUrl, UriKind.Absolute, out var endpoint))
+        {
+            return SendAttempt.Completed(TransportSendResult.NonRetryable("invalid_transport_endpoint"));
         }
 
         if (!_endpointSecurityPolicy.IsAllowed(endpoint))
         {
-            return TransportSendResult.NonRetryable("Transport endpoint must use HTTPS.");
+            return SendAttempt.Completed(TransportSendResult.NonRetryable("https_required"));
         }
 
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(endpoint, "/api/edge/v1/events/batch"));
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", context.AccessToken);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", lease.AccessToken);
 
         var correlationId = Guid.NewGuid().ToString("N");
         request.Headers.Add("x-correlation-id", correlationId);
-
         request.Content = JsonContent.Create(new BatchRequest(
-            context.AgentId,
-            context.TenantBinding,
+            lease.AgentId,
+            lease.TenantBinding,
             batch.Select(item => item.Payload).ToArray()), options: SerializerOptions);
 
         try
@@ -72,7 +97,7 @@ public sealed class HttpEventTransport : IEventTransport
 
             if ((int)response.StatusCode >= 500 || response.StatusCode == HttpStatusCode.RequestTimeout)
             {
-                return TransportSendResult.Retryable($"Transport failed with status {(int)response.StatusCode}.");
+                return SendAttempt.Completed(TransportSendResult.Retryable($"http_{(int)response.StatusCode}"));
             }
 
             BatchResponse? body;
@@ -86,44 +111,71 @@ public sealed class HttpEventTransport : IEventTransport
             }
 
             var acceptedEventIds = body?.AcceptedEventIds ?? Array.Empty<string>();
+            var errorCode = body?.ErrorCode ?? $"http_{(int)response.StatusCode}";
 
             if (response.IsSuccessStatusCode)
             {
                 _logger.LogInformation(
-                    "HTTP transport accepted {AcceptedCount} events with correlation ID {CorrelationId}.",
+                    "HTTP transport accepted {AcceptedCount} events with correlation ID {CorrelationId} using credential generation {Generation}.",
                     acceptedEventIds.Length,
-                    correlationId);
-                return TransportSendResult.Success(acceptedEventIds);
+                    correlationId,
+                    lease.Generation);
+                return SendAttempt.Completed(TransportSendResult.Success(acceptedEventIds));
             }
 
-            var errorCode = body?.ErrorCode ?? $"http_{(int)response.StatusCode}";
-            var errorMessage = body?.Message ?? "Transport request failed.";
-            var combined = $"{errorCode}: {errorMessage}";
-
-            if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden or HttpStatusCode.BadRequest)
+            if (response.StatusCode == HttpStatusCode.Unauthorized &&
+                string.Equals(errorCode, "access_token_expired", StringComparison.Ordinal))
             {
-                return TransportSendResult.NonRetryable(combined, acceptedEventIds);
+                return SendAttempt.Expired();
+            }
+
+            if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            {
+                var invalidated = await _credentialProvider.InvalidateAfterAuthenticationFailureAsync(
+                    lease.Generation,
+                    errorCode,
+                    cancellationToken);
+                return invalidated.Lease is null
+                    ? SendAttempt.Completed(TransportSendResult.AuthenticationRequired(errorCode))
+                    : SendAttempt.Completed(TransportSendResult.Retryable("stale_authentication_failure"));
+            }
+
+            if (response.StatusCode == HttpStatusCode.BadRequest)
+            {
+                return SendAttempt.Completed(TransportSendResult.NonRetryable(errorCode, acceptedEventIds));
             }
 
             if (response.StatusCode == HttpStatusCode.Conflict &&
                 string.Equals(errorCode, "duplicate_event_id", StringComparison.Ordinal))
             {
-                return TransportSendResult.Success(batch.Select(item => item.Payload.EventId));
+                return SendAttempt.Completed(TransportSendResult.Success(batch.Select(item => item.Payload.EventId)));
             }
 
-            return TransportSendResult.Retryable(combined, acceptedEventIds);
+            return SendAttempt.Completed(TransportSendResult.Retryable(errorCode, acceptedEventIds));
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return TransportSendResult.Retryable("Transport request timed out.");
+            return SendAttempt.Completed(TransportSendResult.Retryable("transport_timeout"));
         }
-        catch (HttpRequestException ex)
+        catch (HttpRequestException)
         {
-            return TransportSendResult.Retryable($"Transport request failed: {ex.Message}");
+            return SendAttempt.Completed(TransportSendResult.Retryable("transport_network_error"));
         }
     }
+
+    private static TransportSendResult MapCredentialFailure(CredentialLeaseResult result) =>
+        result.Kind == CredentialAvailabilityKind.AuthenticationRequired
+            ? TransportSendResult.AuthenticationRequired(result.ErrorCode ?? "authentication_required")
+            : TransportSendResult.Retryable(result.ErrorCode ?? "credential_unavailable");
 
     private sealed record BatchRequest(string AgentId, string TenantBinding, IReadOnlyList<AgentHeartbeatEvent> Events);
 
     private sealed record BatchResponse(string[] AcceptedEventIds, string? ErrorCode, string? Message);
+
+    private sealed record SendAttempt(TransportSendResult Result, bool AccessTokenExpired)
+    {
+        public static SendAttempt Completed(TransportSendResult result) => new(result, false);
+
+        public static SendAttempt Expired() => new(TransportSendResult.Retryable("access_token_expired"), true);
+    }
 }

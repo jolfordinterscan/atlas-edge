@@ -4,7 +4,8 @@ public enum TransportFailureKind
 {
     None = 0,
     Retryable = 1,
-    NonRetryable = 2
+    NonRetryable = 2,
+    AuthenticationRequired = 3
 }
 
 public sealed record TransportSendResult(
@@ -22,4 +23,7 @@ public sealed record TransportSendResult(
 
     public static TransportSendResult NonRetryable(string error, IEnumerable<string>? acceptedEventIds = null) =>
         new((acceptedEventIds ?? Array.Empty<string>()).ToHashSet(StringComparer.Ordinal), TransportFailureKind.NonRetryable, error);
+
+    public static TransportSendResult AuthenticationRequired(string error) =>
+        new(new HashSet<string>(StringComparer.Ordinal), TransportFailureKind.AuthenticationRequired, error);
 }

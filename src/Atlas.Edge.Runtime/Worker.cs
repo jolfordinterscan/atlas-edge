@@ -19,8 +19,10 @@ public sealed class Worker : BackgroundService
     private readonly AtlasEdgeOptions _options;
     private readonly IEventQueue _queue;
     private readonly RuntimeState _runtimeState;
+    private readonly RuntimeIdentityState _runtimeIdentityState;
     private readonly RuntimeTransportCredentialProvider _transportCredentialProvider;
     private readonly IEventTransport _transport;
+    private readonly TimeProvider _timeProvider;
     private AgentIdentity? _identity;
 
     public Worker(
@@ -33,6 +35,8 @@ public sealed class Worker : BackgroundService
         IEventTransport transport,
         RuntimeTransportCredentialProvider transportCredentialProvider,
         RuntimeState runtimeState,
+        RuntimeIdentityState runtimeIdentityState,
+        TimeProvider timeProvider,
         ILogger<Worker> logger)
     {
         _identityProvider = identityProvider;
@@ -43,6 +47,8 @@ public sealed class Worker : BackgroundService
         _transport = transport;
         _transportCredentialProvider = transportCredentialProvider;
         _runtimeState = runtimeState;
+        _runtimeIdentityState = runtimeIdentityState;
+        _timeProvider = timeProvider;
         _logger = logger;
         _options = options.Value;
     }
@@ -64,12 +70,12 @@ public sealed class Worker : BackgroundService
                 if (identity is null)
                 {
                     _runtimeState.Update(RuntimeStatus.Degraded, "Identity is unavailable. Enrollment will be retried.");
-                    await Task.Delay(TimeSpan.FromSeconds(Math.Min(_options.HeartbeatIntervalSeconds, 5)), stoppingToken);
+                    await Task.Delay(TimeSpan.FromSeconds(Math.Min(_options.HeartbeatIntervalSeconds, 5)), _timeProvider, stoppingToken);
                     continue;
                 }
 
                 await ProcessHeartbeatAsync(identity, stoppingToken);
-                await Task.Delay(TimeSpan.FromSeconds(_options.HeartbeatIntervalSeconds), stoppingToken);
+                await Task.Delay(TimeSpan.FromSeconds(_options.HeartbeatIntervalSeconds), _timeProvider, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -82,7 +88,7 @@ public sealed class Worker : BackgroundService
 
                 try
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(Math.Min(_options.HeartbeatIntervalSeconds, 5)), stoppingToken);
+                    await Task.Delay(TimeSpan.FromSeconds(Math.Min(_options.HeartbeatIntervalSeconds, 5)), _timeProvider, stoppingToken);
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
@@ -101,7 +107,7 @@ public sealed class Worker : BackgroundService
 
     private async Task ProcessHeartbeatAsync(AgentIdentity identity, CancellationToken cancellationToken)
     {
-        var heartbeat = _heartbeatEventBuilder.Build(identity, _options, DateTimeOffset.UtcNow);
+        var heartbeat = _heartbeatEventBuilder.Build(identity, _options, _timeProvider.GetUtcNow());
         var receiptId = await _queue.EnqueueAsync(heartbeat, cancellationToken);
 
         _logger.LogInformation(
@@ -134,7 +140,7 @@ public sealed class Worker : BackgroundService
             {
                 await _queue.RetryAsync(
                     rejectedReceipts,
-                    DateTimeOffset.UtcNow.AddSeconds(5),
+                    _timeProvider.GetUtcNow().AddSeconds(5),
                     cancellationToken);
             }
         }
@@ -142,11 +148,21 @@ public sealed class Worker : BackgroundService
         {
             await _queue.RetryAsync(
                 batch.Select(item => item.ReceiptId),
-                DateTimeOffset.UtcNow.AddSeconds(5),
+                _timeProvider.GetUtcNow().AddSeconds(5),
                 cancellationToken);
 
             _runtimeState.Update(RuntimeStatus.Degraded, "Heartbeat delivery failed and is retryable.", result.Error);
             _logger.LogWarning("Retryable transport failure occurred: {Failure}", result.Error);
+        }
+        else if (result.FailureKind == TransportFailureKind.AuthenticationRequired)
+        {
+            await _queue.RetryAsync(
+                batch.Select(item => item.ReceiptId),
+                _timeProvider.GetUtcNow().AddSeconds(5),
+                cancellationToken);
+
+            _runtimeState.Update(RuntimeStatus.Degraded, "Authentication is required; telemetry remains queued.", result.Error);
+            _logger.LogWarning("Authenticated transmission is paused with code {Failure}; telemetry remains queued.", result.Error);
         }
         else
         {
@@ -157,7 +173,10 @@ public sealed class Worker : BackgroundService
         }
 
         var queueHealth = await _queue.GetHealthAsync(cancellationToken);
-        _runtimeState.Update(RuntimeStatus.Running, "Heartbeat cycle completed.");
+        if (result.IsSuccess)
+        {
+            _runtimeState.Update(RuntimeStatus.Running, "Heartbeat cycle completed.");
+        }
 
         _logger.LogInformation(
             "Heartbeat cycle completed with queue pending count {PendingCount} and in-flight count {InFlightCount}.",
@@ -169,12 +188,14 @@ public sealed class Worker : BackgroundService
     {
         if (_identity is not null)
         {
+            _runtimeIdentityState.Update(_identity);
             return _identity;
         }
 
         if (string.Equals(_options.TransportMode, AtlasEdgeOptions.TransportModeNull, StringComparison.OrdinalIgnoreCase))
         {
             _identity = _identityProvider.Create(_options);
+            _runtimeIdentityState.Update(_identity);
             _logger.LogInformation("Using null transport development identity for agent {AgentId}.", _identity.AgentId);
             return _identity;
         }
@@ -183,11 +204,8 @@ public sealed class Worker : BackgroundService
         if (storedCredentials is not null)
         {
             _identity = storedCredentials.Identity;
-            _transportCredentialProvider.SetCurrent(new TransportCredentialContext(
-                storedCredentials.IngestionUrl,
-                storedCredentials.Identity.AgentId,
-                storedCredentials.Identity.TenantBinding,
-                storedCredentials.AccessToken));
+            _runtimeIdentityState.Update(_identity);
+            _transportCredentialProvider.Initialize(storedCredentials);
 
             _logger.LogInformation(
                 "Loaded stored device identity for agent {AgentId} with token fingerprint {TokenFingerprint}.",
@@ -207,7 +225,7 @@ public sealed class Worker : BackgroundService
             _options.EnrollmentCode,
             _options.EnvironmentName,
             Environment.MachineName,
-            DateTimeOffset.UtcNow);
+            _timeProvider.GetUtcNow());
 
         var enrollmentResult = await _enrollmentClient.EnrollAsync(enrollmentRequest, cancellationToken);
         if (enrollmentResult.Response is null)
@@ -231,7 +249,8 @@ public sealed class Worker : BackgroundService
             response.TenantBinding,
             _options.EnvironmentName,
             false,
-            DateTimeOffset.UtcNow);
+            _timeProvider.GetUtcNow());
+        _runtimeIdentityState.Update(_identity);
 
         var credentials = new StoredEdgeCredentials(
             _identity,
@@ -241,15 +260,14 @@ public sealed class Worker : BackgroundService
             response.AccessToken,
             response.RefreshToken,
             response.CredentialExpiryUtc.ToUniversalTime(),
-            DateTimeOffset.UtcNow);
+            response.RefreshTokenExpiryUtc.ToUniversalTime(),
+            response.TokenRefreshUrl,
+            1,
+            _timeProvider.GetUtcNow());
 
         await _credentialStore.SaveAsync(credentials, cancellationToken);
 
-        _transportCredentialProvider.SetCurrent(new TransportCredentialContext(
-            response.IngestionUrl,
-            response.AgentId,
-            response.TenantBinding,
-            response.AccessToken));
+        _transportCredentialProvider.Initialize(credentials);
 
         _logger.LogInformation(
             "Enrollment succeeded for agent {AgentId}; site timezone {SiteTimezone}; token fingerprint {TokenFingerprint}.",

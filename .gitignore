@@ -12,6 +12,7 @@ obj/
 out/
 dist/
 build/
+/artifacts/installer/
 
 # Logs and temp
 *.log

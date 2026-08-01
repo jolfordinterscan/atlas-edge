@@ -9,8 +9,9 @@ public sealed class SecretRedactionTests
     {
         var redacted = SecretRedactor.Redact("abcdefghijklmnopqrstuvwxyz");
 
-        Assert.StartsWith("abcd", redacted, StringComparison.Ordinal);
-        Assert.EndsWith("wxyz", redacted, StringComparison.Ordinal);
-        Assert.Contains("...", redacted, StringComparison.Ordinal);
+        Assert.StartsWith("sha256:", redacted, StringComparison.Ordinal);
+        Assert.Equal(19, redacted.Length);
+        Assert.DoesNotContain("abcd", redacted, StringComparison.Ordinal);
+        Assert.DoesNotContain("wxyz", redacted, StringComparison.Ordinal);
     }
 }

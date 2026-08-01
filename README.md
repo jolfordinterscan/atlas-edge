@@ -47,10 +47,16 @@ This repository is at the secure local enrollment checkpoint stage.
 - A .NET 8 runtime foundation exists for development validation
 - Secure enrollment is implemented against a local mock Atlas API over HTTPS
 - Authenticated outbound heartbeat delivery is implemented for local development
+- Access tokens refresh proactively with clock-skew tolerance and rotated credential persistence
+- Expired access-token responses refresh and replay once; permanent authentication failures retain queued telemetry
+- Read-only periodic scanner inventory discovery is implemented with WIA as the conservative default Windows provider
+- Scanner inventory uses stable hashed identity, bounded normalized metadata, conservative status, provider timeouts, and failure isolation
+- Changed inventories produce one coalesced local `scanner.inventory` event; the event is never sent because Atlas Platform currently accepts only heartbeats
+- Read-only scanner health collection preserves unknown metrics and calculates evidence-based category scores
 - macOS credential storage is development-only and uses protected local persistence
 - Windows protected credential storage remains required before pilot release
 - No live Atlas Platform integration exists yet
-- Scanner discovery and page counts remain unimplemented
+- Scanner health telemetry transmission, prediction, and automated remediation remain unimplemented
 
 ## US-First Deployment Scope
 
@@ -79,7 +85,7 @@ See [REPOSITORY-MAP.md](REPOSITORY-MAP.md) for the complete repository map.
 This repository contains a local secure enrollment and authenticated transport checkpoint.
 Integration is intentionally limited to tools/Atlas.Edge.MockAtlasApi over local HTTPS.
 Do not use this runtime against production Atlas endpoints.
-Scanner discovery, page-count collection, migrations, and remote control remain out of scope.
+Scanner commands, health telemetry transmission, prediction, automated remediation, migrations, and remote control remain out of scope.
 
 ## Local Mock HTTPS Runbook
 
@@ -92,3 +98,11 @@ Scanner discovery, page-count collection, migrations, and remote control remain 
 	- `ATLAS_EDGE_AtlasEdge__TransportMode=Http ATLAS_EDGE_AtlasEdge__EnrollmentCode=<your-local-code> dotnet run --project src/Atlas.Edge.Runtime/Atlas.Edge.Runtime.csproj`
 
 HTTPS is required by default for enrollment and ingestion. For an HTTP-only local endpoint, developers must set both `AtlasEdge:EnvironmentName` to `Development` and `AtlasEdge:AllowInsecureHttpForDevelopment` to `true`; this override is rejected in every other environment.
+
+Token refresh defaults to five minutes before access-token expiry with 30 seconds of clock-skew tolerance. Refresh timing and bounded retry settings are available under the `AtlasEdge` configuration section. Raw tokens, Authorization headers, and response bodies are never logged; diagnostics use truncated SHA-256 fingerprints and stable error codes.
+
+Scanner discovery runs independently at a bounded interval when `AtlasEdge:ScannerDiscoveryEnabled` is `true`. The default `Platform` mode enables only WIA; optional installed-source TWAIN and ISIS metadata providers must be explicitly listed in `ScannerDiscoveryProviders`. The `Mock` provider returns an obvious local test device and is rejected unless `AtlasEdge:EnvironmentName` is `Development`. `ScannerInventoryPublishMode` defaults to `QueueOnly`, which coalesces the latest changed inventory inside the local queue while heartbeat batches remain transportable. `Transport` is rejected until Atlas Platform supports `scanner.inventory`.
+
+On Windows, run the safe read-only probe with `dotnet run -c Release --project tools/Atlas.Edge.ScannerProbe/Atlas.Edge.ScannerProbe.csproj`. It enumerates WIA scanner-class devices, masks serial numbers, does not open a device or acquisition session, and never transmits.
+
+Scanner health collection also runs once at startup when `AtlasEdge:ScannerHealthEnabled` is `true`. Platform providers retain absent or invalid metrics as unknown. The health `Mock` provider is restricted to Development and publishes only obvious synthetic values.

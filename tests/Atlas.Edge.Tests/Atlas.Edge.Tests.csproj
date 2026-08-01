@@ -12,6 +12,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.6.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.1" />
     <PackageReference Include="xunit" Version="2.4.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -27,11 +28,18 @@
     <ProjectReference Include="..\..\src\Atlas.Edge.Configuration\Atlas.Edge.Configuration.csproj" />
     <ProjectReference Include="..\..\src\Atlas.Edge.Core\Atlas.Edge.Core.csproj" />
     <ProjectReference Include="..\..\src\Atlas.Edge.Enrollment\Atlas.Edge.Enrollment.csproj" />
+    <ProjectReference Include="..\..\src\Atlas.Edge.Knowledge\Atlas.Edge.Knowledge.csproj" />
+    <ProjectReference Include="..\..\src\Atlas.Edge.Patterns\Atlas.Edge.Patterns.csproj" />
     <ProjectReference Include="..\..\src\Atlas.Edge.Queue\Atlas.Edge.Queue.csproj" />
     <ProjectReference Include="..\..\src\Atlas.Edge.Runtime\Atlas.Edge.Runtime.csproj" />
+    <ProjectReference Include="..\..\src\Atlas.Edge.ScannerConnectors\Atlas.Edge.ScannerConnectors.csproj" />
+    <ProjectReference Include="..\..\src\Atlas.Edge.ScannerDiscovery\Atlas.Edge.ScannerDiscovery.csproj" />
+    <ProjectReference Include="..\..\src\Atlas.Edge.ScannerEvidence\Atlas.Edge.ScannerEvidence.csproj" />
+    <ProjectReference Include="..\..\src\Atlas.Edge.ScannerHealth\Atlas.Edge.ScannerHealth.csproj" />
     <ProjectReference Include="..\..\src\Atlas.Edge.Security\Atlas.Edge.Security.csproj" />
     <ProjectReference Include="..\..\src\Atlas.Edge.Telemetry\Atlas.Edge.Telemetry.csproj" />
     <ProjectReference Include="..\..\src\Atlas.Edge.Transport\Atlas.Edge.Transport.csproj" />
+    <ProjectReference Include="..\..\tools\Atlas.Edge.MockAtlasApi\Atlas.Edge.MockAtlasApi.csproj" />
   </ItemGroup>
 
 </Project>

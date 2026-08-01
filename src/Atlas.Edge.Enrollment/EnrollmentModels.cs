@@ -28,7 +28,11 @@ public sealed record EnrollmentResponse(
     [property: JsonPropertyName("refresh_token")]
     string RefreshToken,
     [property: JsonPropertyName("credential_expiry_utc")]
-    DateTimeOffset CredentialExpiryUtc);
+    DateTimeOffset CredentialExpiryUtc,
+    [property: JsonPropertyName("refresh_token_expiry_utc")]
+    DateTimeOffset RefreshTokenExpiryUtc,
+    [property: JsonPropertyName("token_refresh_url")]
+    string TokenRefreshUrl);
 
 public sealed record EnrollmentResult(
     EnrollmentResponse? Response,

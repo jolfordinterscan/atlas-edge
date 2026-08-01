@@ -1,0 +1,16 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal">
+  <Bundle Name="Atlas Edge Setup"
+          Manufacturer="InterScan"
+          Version="$(var.ProductVersion)"
+          UpgradeCode="CA6AE612-E4FE-458B-BAD7-3D04931DBEE1">
+    <BootstrapperApplication>
+      <bal:WixStandardBootstrapperApplication Theme="hyperlinkLicense"
+                                               LogoFile="$(var.BrandAssetsDir)\interscan-logo.png"
+                                               LicenseUrl="" />
+    </BootstrapperApplication>
+    <Chain>
+      <MsiPackage SourceFile="$(var.MsiPath)" Vital="yes" Visible="no" />
+    </Chain>
+  </Bundle>
+</Wix>

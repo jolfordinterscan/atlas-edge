@@ -1,0 +1,91 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <?foreach WIXUIARCH in X86;X64;A64 ?>
+  <Fragment>
+    <UI Id="AtlasEdgeInstallDir_$(WIXUIARCH)">
+      <Publish Dialog="BrowseDlg" Control="OK" Event="CheckTargetPath" Value="[WIXUI_INSTALLDIR]" Order="1" />
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="CheckTargetPath" Value="[WIXUI_INSTALLDIR]" Order="1" />
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Order="4" />
+    </UI>
+    <UIRef Id="AtlasEdgeInstallDir" />
+  </Fragment>
+  <?endforeach?>
+
+  <Fragment>
+    <UI Id="file AtlasEdgeInstallDir">
+      <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
+      <TextStyle Id="WixUI_Font_Bigger" FaceName="Tahoma" Size="12" />
+      <TextStyle Id="WixUI_Font_Title" FaceName="Tahoma" Size="9" Bold="yes" />
+      <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
+
+      <DialogRef Id="BrowseDlg" />
+      <DialogRef Id="DiskCostDlg" />
+      <DialogRef Id="ErrorDlg" />
+      <DialogRef Id="FatalError" />
+      <DialogRef Id="FilesInUse" />
+      <DialogRef Id="MsiRMFilesInUse" />
+      <DialogRef Id="PrepareDlg" />
+      <DialogRef Id="ProgressDlg" />
+      <DialogRef Id="ResumeDlg" />
+      <DialogRef Id="UserExit" />
+
+      <Dialog Id="AtlasTelemetryPrivacyDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="yes" Text="WixUIBannerBmp" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="300" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Atlas Edge Telemetry and Privacy Disclosure" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="320" Height="15" Transparent="yes" NoPrefix="yes" Text="Review the operational telemetry and privacy disclosure." />
+        <Control Id="DisclosureText" Type="ScrollableText" X="20" Y="55" Width="330" Height="142" Sunken="yes" TabSkip="no">
+          <Text SourceFile="$(var.InstallerRoot)\legal\ATLAS-EDGE-TELEMETRY-PRIVACY-DRAFT.rtf" />
+        </Control>
+        <Control Id="TelemetryAccepted" Type="CheckBox" X="20" Y="205" Width="330" Height="20" Property="ATLAS_ACCEPT_TELEMETRY" CheckBoxValue="1" Text="I understand the operational telemetry and privacy disclosure." />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" EnableCondition="ATLAS_ACCEPT_TELEMETRY = 1" DisableCondition="NOT ATLAS_ACCEPT_TELEMETRY = 1" />
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <Dialog Id="AtlasAdministratorAuthorizationDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="yes" Text="WixUIBannerBmp" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="300" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Administrator Authorization" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="320" Height="15" Transparent="yes" NoPrefix="yes" Text="Confirm organizational authorization before installation." />
+        <Control Id="AuthorizationCopy" Type="Text" X="25" Y="64" Width="320" Height="54" NoPrefix="yes" Text="Atlas Edge installs a per-machine Windows Service and enables the operational monitoring described in the preceding disclosure. Windows administrative elevation is separately required." />
+        <Control Id="UpdateDisclosure" Type="Text" X="25" Y="126" Width="320" Height="42" NoPrefix="yes" Text="Atlas Edge may support digitally signed software updates in a future release. Automatic update behavior is not enabled by this installer foundation." />
+        <Control Id="AdministratorAuthorized" Type="CheckBox" X="25" Y="178" Width="320" Height="48" Property="ATLAS_ADMIN_AUTHORIZED" CheckBoxValue="1" Text="I confirm that I am authorized by my organization to install Atlas Edge on this computer and to enable the operational monitoring described above." />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" ElevationShield="yes" Text="!(loc.WixUINext)" EnableCondition="ATLAS_ADMIN_AUTHORIZED = 1" DisableCondition="NOT ATLAS_ADMIN_AUTHORIZED = 1" />
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999" />
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="LicenseAgreementDlg" Condition="NOT Installed" />
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="Installed AND PATCH" />
+
+      <Publish Dialog="LicenseAgreementDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" />
+      <Publish Dialog="LicenseAgreementDlg" Control="Next" Property="ATLAS_ACCEPT_EULA" Value="1" Order="1" Condition="LicenseAccepted = &quot;1&quot;" />
+      <Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog" Value="AtlasTelemetryPrivacyDlg" Order="2" Condition="LicenseAccepted = &quot;1&quot;" />
+      <Publish Dialog="AtlasTelemetryPrivacyDlg" Control="Back" Event="NewDialog" Value="LicenseAgreementDlg" />
+      <Publish Dialog="AtlasTelemetryPrivacyDlg" Control="Next" Event="NewDialog" Value="AtlasAdministratorAuthorizationDlg" Condition="ATLAS_ACCEPT_TELEMETRY = 1" />
+      <Publish Dialog="AtlasAdministratorAuthorizationDlg" Control="Back" Event="NewDialog" Value="AtlasTelemetryPrivacyDlg" />
+      <Publish Dialog="AtlasAdministratorAuthorizationDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg" Condition="ATLAS_ADMIN_AUTHORIZED = 1" />
+
+      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="AtlasAdministratorAuthorizationDlg" Condition="NOT Installed" />
+      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Condition="Installed" />
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="SetTargetPath" Value="[WIXUI_INSTALLDIR]" Order="3" />
+      <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Property="_BrowseProperty" Value="[WIXUI_INSTALLDIR]" Order="1" />
+      <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Event="SpawnDialog" Value="BrowseDlg" Order="2" />
+      <Publish Dialog="BrowseDlg" Control="OK" Event="SetTargetPath" Value="[_BrowseProperty]" Order="3" />
+      <Publish Dialog="BrowseDlg" Control="OK" Event="EndDialog" Value="Return" Order="4" />
+
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="InstallDirDlg" Order="1" Condition="NOT Installed" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2" Condition="Installed AND NOT PATCH" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2" Condition="Installed AND PATCH" />
+      <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg" />
+      <Property Id="ARPNOMODIFY" Value="1" />
+    </UI>
+    <UIRef Id="WixUI_Common" />
+  </Fragment>
+</Wix>

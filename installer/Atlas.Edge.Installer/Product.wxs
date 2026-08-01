@@ -1,0 +1,133 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <Package Name="Atlas Edge"
+           Manufacturer="InterScan"
+           Version="$(var.ProductVersion)"
+           UpgradeCode="7A55399F-274D-4AB8-BB45-760F8DA853E4"
+           Language="1033"
+           Scope="perMachine"
+           InstallerVersion="500">
+    <SummaryInformation Description="Enterprise scanner intelligence and monitoring for InterScan Atlas" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Atlas Edge is already installed. Downgrades are not supported." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Launch Condition="VersionNT64 &gt;= v10.0" Message="Atlas Edge requires 64-bit Windows 10, Windows 11, or Windows Server 2016 or later." />
+    <Launch Condition="Privileged" Message="Atlas Edge requires an administrator for this per-machine installation." />
+    <Launch Condition="Installed OR UILevel &gt;= 4 OR ATLAS_ACCEPT_EULA = 1" Message="Silent or basic-UI installation requires ATLAS_ACCEPT_EULA=1." />
+    <Launch Condition="Installed OR UILevel &gt;= 4 OR ATLAS_ACCEPT_TELEMETRY = 1" Message="Silent or basic-UI installation requires ATLAS_ACCEPT_TELEMETRY=1." />
+    <Launch Condition="Installed OR UILevel &gt;= 4 OR ATLAS_ADMIN_AUTHORIZED = 1" Message="Silent or basic-UI installation requires ATLAS_ADMIN_AUTHORIZED=1." />
+
+    <Property Id="ATLAS_ACCEPT_EULA" Secure="yes" />
+    <Property Id="ATLAS_ACCEPT_TELEMETRY" Secure="yes" />
+    <Property Id="ATLAS_ADMIN_AUTHORIZED" Secure="yes" />
+    <Property Id="ATLAS_EULA_DOCUMENT_VERSION" Value="DRAFT-0.1" Secure="yes" />
+    <Property Id="ATLAS_TELEMETRY_DOCUMENT_VERSION" Value="DRAFT-0.1" Secure="yes" />
+    <Property Id="ATLAS_INSTALLATION_MODE" Value="interactive" Secure="yes" />
+    <Property Id="ATLAS_ACCEPTANCE_TIMESTAMP_UTC" Secure="yes" />
+    <SetProperty Id="ATLAS_INSTALLATION_MODE"
+                 Value="silent"
+                 Before="WriteRegistryValues"
+                 Sequence="execute"
+                 Condition="NOT Installed AND UILevel &lt;= 3" />
+    <SetProperty Id="ATLAS_ACCEPTANCE_TIMESTAMP_UTC"
+                 Value="[Date]T[Time]"
+                 Before="WriteRegistryValues"
+                 Sequence="execute"
+                 Condition="NOT Installed AND NOT ATLAS_ACCEPTANCE_TIMESTAMP_UTC" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INTERSCANPROGRAMFILES" Name="InterScan">
+        <Directory Id="INSTALLFOLDER" Name="Atlas Edge" />
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="CommonAppDataFolder">
+      <Directory Id="INTERSCANDATA" Name="InterScan">
+        <Directory Id="ATLASROOTDATA" Name="Atlas Edge">
+          <Directory Id="CONFIGURATIONDATA" Name="configuration" />
+          <Directory Id="IDENTITYDATA" Name="identity" />
+          <Directory Id="DIAGNOSTICSDATA" Name="diagnostics" />
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+
+    <Feature Id="Complete" Title="Atlas Edge" Level="1">
+      <ComponentGroupRef Id="RuntimePayload" />
+      <ComponentGroupRef Id="AtlasEdgeMachineComponents" />
+    </Feature>
+
+    <ComponentGroup Id="AtlasEdgeMachineComponents">
+      <Component Id="AtlasEdgeService" Directory="INSTALLFOLDER" Guid="E1D54506-4D49-4351-B789-F6337450E968" Bitness="always64">
+        <File Id="AtlasEdgeRuntimeExe" Source="$(var.RuntimePublishDir)\Atlas.Edge.Runtime.exe" KeyPath="yes" />
+        <ServiceInstall Id="AtlasEdgeServiceInstall"
+                        Name="Atlas Edge Runtime"
+                        DisplayName="Atlas Edge Runtime"
+                        Description="Enterprise scanner intelligence and monitoring for InterScan Atlas"
+                        Type="ownProcess"
+                        Start="auto"
+                        ErrorControl="normal"
+                        Account="LocalSystem"
+                        Vital="yes">
+          <util:ServiceConfig FirstFailureActionType="restart"
+                              SecondFailureActionType="restart"
+                              ThirdFailureActionType="restart"
+                              RestartServiceDelayInSeconds="60"
+                              ResetPeriodInDays="1" />
+        </ServiceInstall>
+        <ServiceControl Id="AtlasEdgeServiceControl"
+                        Name="Atlas Edge Runtime"
+                        Start="install"
+                        Stop="both"
+                        Remove="uninstall"
+                        Wait="yes" />
+      </Component>
+
+      <Component Id="AtlasEdgeEventLogSource" Directory="INSTALLFOLDER" Guid="EE503DF6-EB73-49E1-995F-F17F24A1B693" Bitness="always64">
+        <RegistryKey Root="HKLM" Key="SYSTEM\CurrentControlSet\Services\EventLog\Application\Atlas Edge Runtime">
+          <RegistryValue Name="EventMessageFile" Type="expandable" Value="[INSTALLFOLDER]Atlas.Edge.Runtime.exe" />
+          <RegistryValue Name="TypesSupported" Type="integer" Value="7" KeyPath="yes" />
+        </RegistryKey>
+      </Component>
+
+      <Component Id="AtlasEdgeDataRoot" Directory="ATLASROOTDATA" Guid="957E1101-F15D-45C3-81F5-9BB1E3B1CB20" Permanent="yes" NeverOverwrite="yes" Bitness="always64">
+        <CreateFolder>
+          <util:PermissionEx User="SYSTEM" GenericAll="yes" />
+          <util:PermissionEx User="Administrators" GenericAll="yes" />
+        </CreateFolder>
+        <RegistryValue Root="HKLM" Key="Software\InterScan\Atlas Edge" Name="DataDirectory" Type="string" Value="[ATLASROOTDATA]" KeyPath="yes" />
+      </Component>
+      <Component Id="AtlasEdgeConfigurationData" Directory="CONFIGURATIONDATA" Guid="7B9261B1-2769-40A6-B7E4-4A47072674D0" Permanent="yes" NeverOverwrite="yes">
+        <CreateFolder />
+        <File Id="ProductionConfiguration" Source="$(var.InstallerRoot)\config\appsettings.json" Name="appsettings.json" KeyPath="yes" NeverOverwrite="yes" />
+      </Component>
+      <Component Id="AtlasEdgeIdentityData" Directory="IDENTITYDATA" Guid="1CC31264-E54C-454F-ABBD-24892071611D" Permanent="yes" NeverOverwrite="yes">
+        <CreateFolder />
+        <RegistryValue Root="HKLM" Key="Software\InterScan\Atlas Edge" Name="IdentityDataRetained" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+      <Component Id="AtlasEdgeDiagnosticsData" Directory="DIAGNOSTICSDATA" Guid="E74C8E92-5BB9-4185-B543-0AA7DE89D71E" Permanent="yes" NeverOverwrite="yes">
+        <CreateFolder />
+        <RegistryValue Root="HKLM" Key="Software\InterScan\Atlas Edge" Name="DiagnosticsRetained" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+      <Component Id="AtlasEdgeInstallerAcceptance" Directory="ATLASROOTDATA" Guid="0EB330CD-1DBD-43DB-8126-BD8ACD72CD5B" Permanent="yes" NeverOverwrite="yes" Bitness="always64">
+        <RegistryKey Root="HKLM" Key="Software\InterScan\Atlas Edge\InstallerAcceptance">
+          <RegistryValue Name="InstallerVersion" Type="string" Value="$(var.ProductVersion)" KeyPath="yes" />
+          <RegistryValue Name="EulaDocumentVersion" Type="string" Value="[ATLAS_EULA_DOCUMENT_VERSION]" />
+          <RegistryValue Name="TelemetryDisclosureVersion" Type="string" Value="[ATLAS_TELEMETRY_DOCUMENT_VERSION]" />
+          <RegistryValue Name="AcceptanceTimestampUtc" Type="string" Value="[ATLAS_ACCEPTANCE_TIMESTAMP_UTC]" />
+          <RegistryValue Name="InstallationMode" Type="string" Value="[ATLAS_INSTALLATION_MODE]" />
+        </RegistryKey>
+      </Component>
+    </ComponentGroup>
+
+    <WixVariable Id="WixUIBannerBmp" Value="$(var.BrandAssetsDir)\interscan-banner.bmp" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(var.BrandAssetsDir)\interscan-dialog.bmp" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.InstallerRoot)\legal\ATLAS-EDGE-EULA-DRAFT.rtf" />
+    <ui:WixUI Id="AtlasEdgeInstallDir" InstallDirectory="INSTALLFOLDER" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="Atlas Edge has been successfully installed. Atlas Edge Runtime service installed. Automatic service startup configured. Local scanner monitoring foundation ready. Atlas enrollment and cloud connectivity are not configured by this installer checkpoint." />
+
+    <ProgressText Action="InstallFiles">Installing Atlas Edge Runtime</ProgressText>
+    <ProgressText Action="WriteRegistryValues">Registering Windows Event Log source and local data directories</ProgressText>
+    <ProgressText Action="InstallServices">Registering Windows Service and configuring automatic startup</ProgressText>
+    <ProgressText Action="StartServices">Starting Atlas Edge Runtime</ProgressText>
+  </Package>
+</Wix>

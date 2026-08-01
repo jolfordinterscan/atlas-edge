@@ -16,6 +16,11 @@
     <ProjectReference Include="..\Atlas.Edge.Core\Atlas.Edge.Core.csproj" />
     <ProjectReference Include="..\Atlas.Edge.Enrollment\Atlas.Edge.Enrollment.csproj" />
     <ProjectReference Include="..\Atlas.Edge.Queue\Atlas.Edge.Queue.csproj" />
+    <ProjectReference Include="..\Atlas.Edge.Patterns\Atlas.Edge.Patterns.csproj" />
+    <ProjectReference Include="..\Atlas.Edge.ScannerConnectors\Atlas.Edge.ScannerConnectors.csproj" />
+    <ProjectReference Include="..\Atlas.Edge.ScannerDiscovery\Atlas.Edge.ScannerDiscovery.csproj" />
+    <ProjectReference Include="..\Atlas.Edge.ScannerEvidence\Atlas.Edge.ScannerEvidence.csproj" />
+    <ProjectReference Include="..\Atlas.Edge.ScannerHealth\Atlas.Edge.ScannerHealth.csproj" />
     <ProjectReference Include="..\Atlas.Edge.Security\Atlas.Edge.Security.csproj" />
     <ProjectReference Include="..\Atlas.Edge.Telemetry\Atlas.Edge.Telemetry.csproj" />
     <ProjectReference Include="..\Atlas.Edge.Transport\Atlas.Edge.Transport.csproj" />

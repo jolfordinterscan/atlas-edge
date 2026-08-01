@@ -6,6 +6,12 @@ public interface IEventQueue
 {
     Task<string> EnqueueAsync(AgentHeartbeatEvent heartbeatEvent, CancellationToken cancellationToken);
 
+    Task<ScannerInventoryEnqueueResult> EnqueueInventoryAsync(
+        ScannerInventoryEvent inventoryEvent,
+        CancellationToken cancellationToken);
+
+    Task<ScannerInventoryEvent?> GetLatestInventoryAsync(CancellationToken cancellationToken);
+
     Task<IReadOnlyList<QueueItem<AgentHeartbeatEvent>>> PeekBatchAsync(int batchSize, CancellationToken cancellationToken);
 
     Task AcknowledgeAsync(IEnumerable<string> receiptIds, CancellationToken cancellationToken);

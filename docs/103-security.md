@@ -29,6 +29,9 @@
 - Windows protected credential storage is still a required gap before pilot release.
 - No plaintext credentials are committed to source.
 - Secret redaction helpers are used for log-safe token fingerprints only.
+- Token fingerprints are truncated SHA-256 digests and never expose token prefixes or suffixes.
+- Credential lifecycle states are Unenrolled, Active, Refreshing, and AuthenticationRequired.
+- Refresh-token rotation is serialized in-process and published only after protected persistence succeeds.
 - Runtime does not expose any inbound listener.
 
 ## Logging And Privacy

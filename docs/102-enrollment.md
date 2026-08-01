@@ -39,10 +39,14 @@ Runtime flow:
 	- access_token
 	- refresh_token placeholder
 	- credential_expiry_utc
+	- refresh_token_expiry_utc
+	- token_refresh_url
 5. Runtime persists identity and credentials in protected local development storage.
 6. Enrollment code reuse is rejected by the local mock API.
 
 Enrollment logs are sanitized and do not emit enrollment_code, access_token, or refresh_token values.
+
+After enrollment, access credentials are refreshed through the returned HTTPS token_refresh_url. Refresh tokens rotate on every successful refresh and the complete rotated record is protected and persisted atomically before it becomes active.
 
 ## Operational Notes
 

@@ -1,0 +1,13 @@
+<Project Sdk="WixToolset.Sdk/4.0.5">
+  <PropertyGroup>
+    <OutputType>Bundle</OutputType>
+    <Platform>x64</Platform>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">0.6.0</ProductVersion>
+    <BrandAssetsDir Condition="'$(BrandAssetsDir)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\installer\staging\branding</BrandAssetsDir>
+    <MsiPath Condition="'$(MsiPath)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\installer\staging\AtlasEdge.msi</MsiPath>
+    <DefineConstants>ProductVersion=$(ProductVersion);BrandAssetsDir=$(BrandAssetsDir);MsiPath=$(MsiPath)</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Bal.wixext" Version="4.0.5" />
+  </ItemGroup>
+</Project>

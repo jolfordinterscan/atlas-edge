@@ -6,6 +6,8 @@ namespace Atlas.Edge.Queue;
 public sealed class InMemoryEventQueue : IEventQueue
 {
     private readonly ConcurrentDictionary<string, QueueEntry> _entries = new();
+    private readonly object _inventorySync = new();
+    private ScannerInventoryQueueEntry? _latestInventory;
 
     public Task<string> EnqueueAsync(AgentHeartbeatEvent heartbeatEvent, CancellationToken cancellationToken)
     {
@@ -24,6 +26,42 @@ public sealed class InMemoryEventQueue : IEventQueue
             false);
 
         return Task.FromResult(receiptId);
+    }
+
+    public Task<ScannerInventoryEnqueueResult> EnqueueInventoryAsync(
+        ScannerInventoryEvent inventoryEvent,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(inventoryEvent);
+
+        lock (_inventorySync)
+        {
+            if (_latestInventory is not null &&
+                string.Equals(
+                    _latestInventory.Event.InventoryVersion,
+                    inventoryEvent.InventoryVersion,
+                    StringComparison.Ordinal))
+            {
+                return Task.FromResult(new ScannerInventoryEnqueueResult(
+                    _latestInventory.ReceiptId,
+                    false));
+            }
+
+            _latestInventory = new ScannerInventoryQueueEntry(
+                Guid.NewGuid().ToString("N"),
+                inventoryEvent);
+            return Task.FromResult(new ScannerInventoryEnqueueResult(_latestInventory.ReceiptId, true));
+        }
+    }
+
+    public Task<ScannerInventoryEvent?> GetLatestInventoryAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_inventorySync)
+        {
+            return Task.FromResult(_latestInventory?.Event);
+        }
     }
 
     public Task<IReadOnlyList<QueueItem<AgentHeartbeatEvent>>> PeekBatchAsync(int batchSize, CancellationToken cancellationToken)
@@ -123,4 +161,6 @@ public sealed class InMemoryEventQueue : IEventQueue
                 LastAttemptedAtUtc,
                 AvailableAfterUtc);
     }
+
+    private sealed record ScannerInventoryQueueEntry(string ReceiptId, ScannerInventoryEvent Event);
 }

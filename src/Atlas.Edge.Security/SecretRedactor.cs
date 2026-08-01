@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+
 namespace Atlas.Edge.Security;
 
 public static class SecretRedactor
@@ -9,11 +12,7 @@ public static class SecretRedactor
             return "<empty>";
         }
 
-        if (value.Length <= 8)
-        {
-            return "<redacted>";
-        }
-
-        return $"{value[..4]}...{value[^4..]}";
+        var digest = SHA256.HashData(Encoding.UTF8.GetBytes(value));
+        return $"sha256:{Convert.ToHexString(digest)[..12].ToLowerInvariant()}";
     }
 }

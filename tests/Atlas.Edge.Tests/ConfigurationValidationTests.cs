@@ -84,4 +84,107 @@ public sealed class ConfigurationValidationTests
         Assert.True(result.Failed);
         Assert.Contains(result.Failures!, failure => failure.Contains("AllowInsecureHttpForDevelopment", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void Validate_RejectsUnknownScannerDiscoveryProvider()
+    {
+        var options = new AtlasEdgeOptions
+        {
+            ScannerDiscoveryProvider = "Unsupported"
+        };
+
+        var result = new AtlasEdgeOptionsValidator().Validate(Options.DefaultName, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, failure => failure.Contains("ScannerDiscoveryProvider", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Validate_AllowsMockScannerProviderOnlyInDevelopment()
+    {
+        var development = new AtlasEdgeOptions
+        {
+            ScannerDiscoveryProvider = AtlasEdgeOptions.ScannerDiscoveryProviderMock,
+            EnvironmentName = "Development"
+        };
+        var production = new AtlasEdgeOptions
+        {
+            ScannerDiscoveryProvider = AtlasEdgeOptions.ScannerDiscoveryProviderMock,
+            EnvironmentName = "Production"
+        };
+
+        var validator = new AtlasEdgeOptionsValidator();
+
+        Assert.True(validator.Validate(Options.DefaultName, development).Succeeded);
+        var result = validator.Validate(Options.DefaultName, production);
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, failure => failure.Contains("Development", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Validate_RejectsUnknownDiscoveryProviderAndTransportPublication()
+    {
+        var options = new AtlasEdgeOptions
+        {
+            ScannerDiscoveryProviders = ["Wia", "VendorSdk"],
+            ScannerInventoryPublishMode = AtlasEdgeOptions.ScannerInventoryPublishModeTransport
+        };
+
+        var result = new AtlasEdgeOptionsValidator().Validate(Options.DefaultName, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, failure => failure.Contains("ScannerDiscoveryProviders", StringComparison.Ordinal));
+        Assert.Contains(result.Failures!, failure => failure.Contains("scanner.inventory", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Validate_AllowsBoundedQueueOnlyWiaDiscovery()
+    {
+        var options = new AtlasEdgeOptions
+        {
+            ScannerDiscoveryProviders = ["Wia"],
+            ScannerInventoryPublishMode = AtlasEdgeOptions.ScannerInventoryPublishModeQueueOnly,
+            ScannerDiscoveryIntervalSeconds = 300,
+            ScannerDiscoveryStartupDelaySeconds = 5,
+            ScannerDiscoveryProviderTimeoutSeconds = 15
+        };
+
+        Assert.True(new AtlasEdgeOptionsValidator().Validate(Options.DefaultName, options).Succeeded);
+    }
+
+    [Fact]
+    public void Validate_RejectsUnknownScannerHealthProvider()
+    {
+        var options = new AtlasEdgeOptions
+        {
+            ScannerHealthProvider = "Unsupported"
+        };
+
+        var result = new AtlasEdgeOptionsValidator().Validate(Options.DefaultName, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, failure => failure.Contains("ScannerHealthProvider", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Validate_AllowsMockScannerHealthProviderOnlyInDevelopment()
+    {
+        var development = new AtlasEdgeOptions
+        {
+            ScannerHealthProvider = AtlasEdgeOptions.ScannerHealthProviderMock,
+            EnvironmentName = "Development"
+        };
+        var production = new AtlasEdgeOptions
+        {
+            ScannerHealthProvider = AtlasEdgeOptions.ScannerHealthProviderMock,
+            EnvironmentName = "Production"
+        };
+
+        var validator = new AtlasEdgeOptionsValidator();
+
+        Assert.True(validator.Validate(Options.DefaultName, development).Succeeded);
+        var result = validator.Validate(Options.DefaultName, production);
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, failure => failure.Contains("Development", StringComparison.Ordinal));
+    }
 }

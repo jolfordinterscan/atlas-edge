@@ -51,6 +51,26 @@ public static class EnrollmentResponseValidator
             return "Enrollment response missing credential_expiry_utc.";
         }
 
+        if (response.RefreshTokenExpiryUtc == default)
+        {
+            return "Enrollment response missing refresh_token_expiry_utc.";
+        }
+
+        if (response.RefreshTokenExpiryUtc <= response.CredentialExpiryUtc)
+        {
+            return "Enrollment response refresh token expiry must be later than access token expiry.";
+        }
+
+        if (!Uri.TryCreate(response.TokenRefreshUrl, UriKind.Absolute, out var refreshUri))
+        {
+            return "Enrollment response token_refresh_url must be an absolute URI.";
+        }
+
+        if (!endpointSecurityPolicy.IsAllowed(refreshUri))
+        {
+            return "Enrollment response token_refresh_url must use HTTPS.";
+        }
+
         return null;
     }
 }

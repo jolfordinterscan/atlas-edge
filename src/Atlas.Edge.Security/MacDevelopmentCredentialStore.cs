@@ -62,10 +62,36 @@ public sealed class MacDevelopmentCredentialStore : ICredentialStore
 
         var payload = JsonSerializer.Serialize(credentials, SerializerOptions);
         var protectedPayload = _protector.Protect(payload);
+        var temporaryPath = Path.Combine(
+            Path.GetDirectoryName(_storeFilePath)!,
+            $"credentials.{Guid.NewGuid():N}.tmp");
 
-        await File.WriteAllTextAsync(_storeFilePath, protectedPayload, Encoding.UTF8, cancellationToken);
+        try
+        {
+            await File.WriteAllTextAsync(temporaryPath, protectedPayload, Encoding.UTF8, cancellationToken);
+            TryRestrictFileAccess(temporaryPath);
+            File.Move(temporaryPath, _storeFilePath, overwrite: true);
+            TryRestrictFileAccess(_storeFilePath);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+            {
+                File.Delete(temporaryPath);
+            }
+        }
+    }
 
-        TryRestrictFileAccess(_storeFilePath);
+    public Task DeleteAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (File.Exists(_storeFilePath))
+        {
+            File.Delete(_storeFilePath);
+        }
+
+        return Task.CompletedTask;
     }
 
     private static void TryRestrictFileAccess(string path)

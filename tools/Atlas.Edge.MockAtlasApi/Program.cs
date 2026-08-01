@@ -3,27 +3,38 @@ using System.Collections.Concurrent;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddEnvironmentVariables("ATLAS_MOCK_");
+builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 
 var app = builder.Build();
+var timeProvider = app.Services.GetRequiredService<TimeProvider>();
 
 var mockConfig = builder.Configuration.GetSection("MockAtlas");
 var expectedCode = mockConfig["DevelopmentEnrollmentCode"] ?? "SET_VIA_ATLAS_MOCK_MockAtlas__DevelopmentEnrollmentCode";
 var tenantBinding = mockConfig["TenantBinding"] ?? "tenant-dev-a";
 var ingestionUrl = mockConfig["IngestionUrl"] ?? "https://localhost:7143/";
+var tokenRefreshUrl = mockConfig["TokenRefreshUrl"] ?? "https://localhost:7143/api/edge/v1/token/refresh";
 var siteTimezone = mockConfig["SiteTimezone"] ?? "UTC";
-var ttlMinutes = int.TryParse(mockConfig["AccessTokenTtlMinutes"], out var parsedTtl) && parsedTtl > 0 ? parsedTtl : 60;
+var accessTokenTtlSeconds = int.TryParse(mockConfig["AccessTokenTtlSeconds"], out var parsedAccessTtl) && parsedAccessTtl >= 0
+    ? parsedAccessTtl
+    : 3600;
+var refreshTokenTtlSeconds = int.TryParse(mockConfig["RefreshTokenTtlSeconds"], out var parsedRefreshTtl) && parsedRefreshTtl >= 0
+    ? parsedRefreshTtl
+    : 86400;
+var revokeIssuedRefreshTokens = bool.TryParse(mockConfig["RevokeIssuedRefreshTokens"], out var parsedRevoke) && parsedRevoke;
 
 var usedEnrollmentCodes = new ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
-var tokenBindings = new ConcurrentDictionary<string, (string AgentId, string TenantBinding)>(StringComparer.Ordinal);
+var accessTokenBindings = new ConcurrentDictionary<string, AccessTokenBinding>(StringComparer.Ordinal);
+var refreshTokenBindings = new ConcurrentDictionary<string, RefreshTokenBinding>(StringComparer.Ordinal);
+var usedRefreshTokens = new ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
 var seenEventIds = new ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
 
 app.MapGet("/health", () => Results.Ok(new
 {
     status = "ok",
-    now_utc = DateTimeOffset.UtcNow
+    now_utc = timeProvider.GetUtcNow()
 }));
 
-app.MapPost("/api/edge/v1/enroll", (EnrollmentRequest request, ILoggerFactory loggerFactory) =>
+app.MapPost("/api/edge/v1/enroll", (MockEnrollmentRequest request, ILoggerFactory loggerFactory) =>
 {
     var logger = loggerFactory.CreateLogger("MockEnrollment");
 
@@ -51,15 +62,23 @@ app.MapPost("/api/edge/v1/enroll", (EnrollmentRequest request, ILoggerFactory lo
 
     var agentId = $"agent-{Guid.NewGuid():N}";
     var deviceId = $"device-{Guid.NewGuid():N}";
-    var accessToken = Convert.ToBase64String(Guid.NewGuid().ToByteArray()) + Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-    var refreshToken = "refresh-token-placeholder";
-    var expiryUtc = DateTimeOffset.UtcNow.AddMinutes(ttlMinutes);
+    var accessToken = CreateToken();
+    var refreshToken = CreateToken();
+    var now = timeProvider.GetUtcNow();
+    var expiryUtc = now.AddSeconds(accessTokenTtlSeconds);
+    var refreshExpiryUtc = now.AddSeconds(refreshTokenTtlSeconds);
 
-    tokenBindings[accessToken] = (agentId, tenantBinding);
+    accessTokenBindings[accessToken] = new AccessTokenBinding(agentId, deviceId, tenantBinding, expiryUtc);
+    refreshTokenBindings[refreshToken] = new RefreshTokenBinding(
+        agentId,
+        deviceId,
+        tenantBinding,
+        refreshExpiryUtc,
+        revokeIssuedRefreshTokens);
 
     logger.LogInformation("Enrollment accepted for agent {AgentId} and machine {MachineName}.", agentId, request.machine_name);
 
-    return Results.Ok(new EnrollmentResponse(
+    return Results.Ok(new MockEnrollmentResponse(
         agent_id: agentId,
         device_id: deviceId,
         tenant_binding: tenantBinding,
@@ -67,7 +86,93 @@ app.MapPost("/api/edge/v1/enroll", (EnrollmentRequest request, ILoggerFactory lo
         site_timezone: siteTimezone,
         access_token: accessToken,
         refresh_token: refreshToken,
-        credential_expiry_utc: expiryUtc));
+        credential_expiry_utc: expiryUtc,
+        refresh_token_expiry_utc: refreshExpiryUtc,
+        token_refresh_url: tokenRefreshUrl));
+});
+
+app.MapPost("/api/edge/v1/token/refresh", (MockTokenRefreshRequest request) =>
+{
+    if (request is null || string.IsNullOrWhiteSpace(request.refresh_token))
+    {
+        return Results.Json(
+            new ErrorResponse("invalid_refresh_token", "Refresh token is invalid.", retryable: false),
+            statusCode: StatusCodes.Status401Unauthorized);
+    }
+
+    if (usedRefreshTokens.ContainsKey(request.refresh_token))
+    {
+        return Results.Json(
+            new ErrorResponse("refresh_token_reused", "Refresh token has already been used.", retryable: false),
+            statusCode: StatusCodes.Status401Unauthorized);
+    }
+
+    if (!refreshTokenBindings.TryGetValue(request.refresh_token, out var binding))
+    {
+        return Results.Json(
+            new ErrorResponse("invalid_refresh_token", "Refresh token is invalid.", retryable: false),
+            statusCode: StatusCodes.Status401Unauthorized);
+    }
+
+    if (!string.Equals(request.agent_id, binding.AgentId, StringComparison.Ordinal) ||
+        !string.Equals(request.device_id, binding.DeviceId, StringComparison.Ordinal) ||
+        !string.Equals(request.tenant_binding, binding.TenantBinding, StringComparison.Ordinal))
+    {
+        return Results.Json(
+            new ErrorResponse("binding_mismatch", "Credential binding does not match.", retryable: false),
+            statusCode: StatusCodes.Status409Conflict);
+    }
+
+    if (binding.Revoked)
+    {
+        return Results.Json(
+            new ErrorResponse("refresh_token_revoked", "Refresh token is revoked.", retryable: false),
+            statusCode: StatusCodes.Status403Forbidden);
+    }
+
+    if (binding.ExpiryUtc <= timeProvider.GetUtcNow())
+    {
+        return Results.Json(
+            new ErrorResponse("refresh_token_expired", "Refresh token is expired.", retryable: false),
+            statusCode: StatusCodes.Status410Gone);
+    }
+
+    if (!refreshTokenBindings.TryRemove(request.refresh_token, out _))
+    {
+        return Results.Json(
+            new ErrorResponse("refresh_token_reused", "Refresh token has already been used.", retryable: false),
+            statusCode: StatusCodes.Status401Unauthorized);
+    }
+
+    usedRefreshTokens[request.refresh_token] = 0;
+
+    var accessToken = CreateToken();
+    var refreshToken = CreateToken();
+    var now = timeProvider.GetUtcNow();
+    var accessExpiryUtc = now.AddSeconds(accessTokenTtlSeconds);
+    var refreshExpiryUtc = now.AddSeconds(refreshTokenTtlSeconds);
+
+    accessTokenBindings[accessToken] = new AccessTokenBinding(
+        binding.AgentId,
+        binding.DeviceId,
+        binding.TenantBinding,
+        accessExpiryUtc);
+    refreshTokenBindings[refreshToken] = new RefreshTokenBinding(
+        binding.AgentId,
+        binding.DeviceId,
+        binding.TenantBinding,
+        refreshExpiryUtc,
+        revokeIssuedRefreshTokens);
+
+    return Results.Ok(new MockTokenRefreshResponse(
+        binding.AgentId,
+        binding.DeviceId,
+        binding.TenantBinding,
+        "Bearer",
+        accessToken,
+        refreshToken,
+        accessExpiryUtc,
+        refreshExpiryUtc));
 });
 
 app.MapPost("/api/edge/v1/events/batch", (BatchRequest request, HttpContext httpContext) =>
@@ -88,10 +193,17 @@ app.MapPost("/api/edge/v1/events/batch", (BatchRequest request, HttpContext http
     }
 
     var token = headerValue["Bearer ".Length..].Trim();
-    if (string.IsNullOrWhiteSpace(token) || !tokenBindings.TryGetValue(token, out var binding))
+    if (string.IsNullOrWhiteSpace(token) || !accessTokenBindings.TryGetValue(token, out var binding))
     {
         return Results.Json(
             new ErrorResponse("unauthorized", "Bearer token is invalid.", retryable: false),
+            statusCode: StatusCodes.Status401Unauthorized);
+    }
+
+    if (binding.ExpiryUtc <= timeProvider.GetUtcNow())
+    {
+        return Results.Json(
+            new ErrorResponse("access_token_expired", "Access token is expired.", retryable: true),
             statusCode: StatusCodes.Status401Unauthorized);
     }
 
@@ -136,13 +248,16 @@ app.MapPost("/api/edge/v1/events/batch", (BatchRequest request, HttpContext http
 
 app.Run();
 
-public sealed record EnrollmentRequest(
+static string CreateToken() =>
+    Convert.ToBase64String(Guid.NewGuid().ToByteArray()) + Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+
+public sealed record MockEnrollmentRequest(
     string enrollment_code,
     string environment_name,
     string machine_name,
     DateTimeOffset requested_at_utc);
 
-public sealed record EnrollmentResponse(
+public sealed record MockEnrollmentResponse(
     string agent_id,
     string device_id,
     string tenant_binding,
@@ -150,7 +265,26 @@ public sealed record EnrollmentResponse(
     string site_timezone,
     string access_token,
     string refresh_token,
-    DateTimeOffset credential_expiry_utc);
+    DateTimeOffset credential_expiry_utc,
+    DateTimeOffset refresh_token_expiry_utc,
+    string token_refresh_url);
+
+public sealed record MockTokenRefreshRequest(
+    string agent_id,
+    string device_id,
+    string tenant_binding,
+    string refresh_token,
+    DateTimeOffset requested_at_utc);
+
+public sealed record MockTokenRefreshResponse(
+    string agent_id,
+    string device_id,
+    string tenant_binding,
+    string token_type,
+    string access_token,
+    string refresh_token,
+    DateTimeOffset credential_expiry_utc,
+    DateTimeOffset refresh_token_expiry_utc);
 
 public sealed record BatchRequest(string agentId, string tenantBinding, BatchEvent[] events);
 
@@ -171,6 +305,23 @@ public sealed record ErrorResponse(string errorCode, string message, bool retrya
 
 public sealed record BatchResponse(string[] acceptedEventIds, string? errorCode, string? message, bool? retryable = null);
 
+public sealed record AccessTokenBinding(
+    string AgentId,
+    string DeviceId,
+    string TenantBinding,
+    DateTimeOffset ExpiryUtc);
+
+public sealed record RefreshTokenBinding(
+    string AgentId,
+    string DeviceId,
+    string TenantBinding,
+    DateTimeOffset ExpiryUtc,
+    bool Revoked);
+
 public partial class Program
+{
+}
+
+public sealed class MockAtlasApiMarker
 {
 }

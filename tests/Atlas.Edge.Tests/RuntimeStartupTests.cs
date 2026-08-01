@@ -1,5 +1,6 @@
 using Atlas.Edge.Configuration;
 using Atlas.Edge.Core;
+using Atlas.Edge.Enrollment;
 using Atlas.Edge.Queue;
 using Atlas.Edge.Runtime;
 using Atlas.Edge.Security;
@@ -36,11 +37,15 @@ public sealed class RuntimeStartupTests
             options.EnvironmentName = "Test";
         });
         builder.Services.AddSingleton<RuntimeState>();
+        builder.Services.AddSingleton<RuntimeIdentityState>();
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton<CredentialExpiryPolicy>();
         builder.Services.AddSingleton(new EndpointSecurityPolicy(allowInsecureHttp: false));
         builder.Services.AddSingleton<DevelopmentIdentityProvider>();
         builder.Services.AddSingleton<RuntimeTransportCredentialProvider>();
         builder.Services.AddSingleton<ICredentialStore>(credentialStore);
         builder.Services.AddSingleton<Atlas.Edge.Enrollment.IEnrollmentClient>(enrollmentClient);
+        builder.Services.AddSingleton<ITokenRefreshClient, StubTokenRefreshClient>();
         builder.Services.AddSingleton<HeartbeatEventBuilder>();
         builder.Services.AddSingleton<IEventQueue, InMemoryEventQueue>();
         builder.Services.AddSingleton<IEventTransport, NullEventTransport>();
@@ -97,6 +102,47 @@ public sealed class RuntimeStartupTests
         Assert.Equal(Atlas.Edge.Core.RuntimeStatus.Stopping, state.Current.Status);
     }
 
+    [Fact]
+    public async Task AuthenticationFailure_KeepsCollectingAndQueueingTelemetry()
+    {
+        var queue = new InMemoryEventQueue();
+        var builder = Host.CreateApplicationBuilder();
+        builder.Services.AddOptions<AtlasEdgeOptions>().Configure(options =>
+        {
+            options.TransportMode = AtlasEdgeOptions.TransportModeNull;
+            options.HeartbeatIntervalSeconds = 1;
+            options.EnvironmentName = "Test";
+        });
+        builder.Services.AddSingleton<RuntimeState>();
+        builder.Services.AddSingleton<RuntimeIdentityState>();
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton<CredentialExpiryPolicy>();
+        builder.Services.AddSingleton(new EndpointSecurityPolicy(allowInsecureHttp: false));
+        builder.Services.AddSingleton<DevelopmentIdentityProvider>();
+        builder.Services.AddSingleton<RuntimeTransportCredentialProvider>();
+        builder.Services.AddSingleton<ITransportCredentialProvider>(sp => sp.GetRequiredService<RuntimeTransportCredentialProvider>());
+        builder.Services.AddSingleton<ICredentialStore, InMemoryCredentialStore>();
+        builder.Services.AddSingleton<IEnrollmentClient, StubEnrollmentClient>();
+        builder.Services.AddSingleton<ITokenRefreshClient, StubTokenRefreshClient>();
+        builder.Services.AddSingleton<HeartbeatEventBuilder>();
+        builder.Services.AddSingleton<IEventQueue>(queue);
+        builder.Services.AddSingleton<IEventTransport, AuthenticationRequiredTransport>();
+        builder.Services.AddLogging();
+        builder.Services.AddHostedService<Worker>();
+
+        using var host = builder.Build();
+        await host.StartAsync();
+        await Task.Delay(1200);
+
+        var health = await queue.GetHealthAsync(CancellationToken.None);
+        var state = host.Services.GetRequiredService<RuntimeState>().Current;
+        await host.StopAsync();
+
+        Assert.True(health.PendingCount >= 1);
+        Assert.Equal(0, health.InFlightCount);
+        Assert.Equal(RuntimeStatus.Degraded, state.Status);
+    }
+
     private static IHost BuildHttpModeHost(InMemoryCredentialStore store, StubEnrollmentClient enrollmentClient)
     {
         var builder = Host.CreateApplicationBuilder();
@@ -118,11 +164,15 @@ public sealed class RuntimeStartupTests
         });
 
         builder.Services.AddSingleton<RuntimeState>();
+        builder.Services.AddSingleton<RuntimeIdentityState>();
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton<CredentialExpiryPolicy>();
         builder.Services.AddSingleton(new EndpointSecurityPolicy(allowInsecureHttp: false));
         builder.Services.AddSingleton<DevelopmentIdentityProvider>();
         builder.Services.AddSingleton<RuntimeTransportCredentialProvider>();
         builder.Services.AddSingleton<ICredentialStore>(store);
         builder.Services.AddSingleton<Atlas.Edge.Enrollment.IEnrollmentClient>(enrollmentClient);
+        builder.Services.AddSingleton<ITokenRefreshClient, StubTokenRefreshClient>();
         builder.Services.AddSingleton<HeartbeatEventBuilder>();
         builder.Services.AddSingleton<IEventQueue, InMemoryEventQueue>();
         builder.Services.AddSingleton<ITransportCredentialProvider>(sp => sp.GetRequiredService<RuntimeTransportCredentialProvider>());
@@ -142,6 +192,14 @@ public sealed class RuntimeStartupTests
         }
     }
 
+    private sealed class AuthenticationRequiredTransport : IEventTransport
+    {
+        public Task<TransportSendResult> SendAsync(
+            IReadOnlyList<QueueItem<AgentHeartbeatEvent>> batch,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(TransportSendResult.AuthenticationRequired("invalid_access_token"));
+    }
+
     private sealed class StubEnrollmentClient : Atlas.Edge.Enrollment.IEnrollmentClient
     {
         public int Calls { get; private set; }
@@ -159,7 +217,9 @@ public sealed class RuntimeStartupTests
                 "UTC",
                 "token-123",
                 "refresh-token-placeholder",
-                DateTimeOffset.UtcNow.AddHours(1));
+                DateTimeOffset.UtcNow.AddHours(1),
+                DateTimeOffset.UtcNow.AddDays(1),
+                "https://localhost:7143/api/edge/v1/token/refresh");
 
             return Task.FromResult(Atlas.Edge.Enrollment.EnrollmentResult.Success(response));
         }
@@ -180,6 +240,33 @@ public sealed class RuntimeStartupTests
             cancellationToken.ThrowIfCancellationRequested();
             _credentials = credentials;
             return Task.CompletedTask;
+        }
+
+        public Task DeleteAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _credentials = null;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class StubTokenRefreshClient : ITokenRefreshClient
+    {
+        public Task<TokenRefreshResult> RefreshAsync(
+            Uri refreshEndpoint,
+            TokenRefreshRequest request,
+            CancellationToken cancellationToken)
+        {
+            var response = new TokenRefreshResponse(
+                request.AgentId,
+                request.DeviceId,
+                request.TenantBinding,
+                "Bearer",
+                "refreshed-access-token",
+                "refreshed-refresh-token",
+                DateTimeOffset.UtcNow.AddHours(1),
+                DateTimeOffset.UtcNow.AddDays(1));
+            return Task.FromResult(TokenRefreshResult.Success(response));
         }
     }
 }

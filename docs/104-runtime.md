@@ -39,7 +39,10 @@ Current behavior:
 6. Accepted event IDs are acknowledged and removed from queue.
 7. Retryable failures are retried.
 8. Non-retryable failures are dropped safely with sanitized logging.
-9. Runtime shuts down gracefully.
+9. Access tokens refresh proactively inside a configurable lead window with clock-skew tolerance.
+10. An explicit access_token_expired response triggers one refresh and one replay.
+11. Invalid or revoked refresh credentials pause authenticated transmission while telemetry continues queueing.
+12. Runtime shuts down gracefully.
 
 Null transport remains available for development fallback.
 No live Atlas integration exists in this checkpoint.

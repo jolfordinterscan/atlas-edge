@@ -29,6 +29,9 @@ public sealed class CredentialStoreTests
                 "super-secret-access-token",
                 "refresh-token-placeholder",
                 DateTimeOffset.UtcNow.AddHours(1),
+                DateTimeOffset.UtcNow.AddDays(1),
+                "https://localhost:7143/api/edge/v1/token/refresh",
+                1,
                 DateTimeOffset.UtcNow);
 
             await store.SaveAsync(credentials, CancellationToken.None);
@@ -40,6 +43,9 @@ public sealed class CredentialStoreTests
 
             var persisted = await File.ReadAllTextAsync(Path.Combine(tempDir, "credentials.protected.json"));
             Assert.DoesNotContain("super-secret-access-token", persisted, StringComparison.Ordinal);
+
+            await store.DeleteAsync(CancellationToken.None);
+            Assert.Null(await store.LoadAsync(CancellationToken.None));
         }
         finally
         {
