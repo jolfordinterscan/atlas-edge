@@ -60,7 +60,18 @@ public sealed class ScannerInventoryEventBuilder : IScannerInventoryEventBuilder
                 scanner.FirstObservedUtc.ToUniversalTime(),
                 scanner.LastObservedUtc.ToUniversalTime(),
                 scanner.MetadataConfidence.ToString(),
-                scanner.DiscoveryWarnings.OrderBy(value => value, StringComparer.Ordinal).ToArray()))
+                scanner.DiscoveryWarnings.OrderBy(value => value, StringComparer.Ordinal).ToArray())
+            {
+                SerialSource = scanner.SerialSource,
+                HardwareId = scanner.HardwareId,
+                DriverProvider = scanner.DriverProvider,
+                UsbVendorId = scanner.UsbVendorId,
+                UsbProductId = scanner.UsbProductId,
+                ContainerId = scanner.ContainerId,
+                LocationPathHash = scanner.LocationPathHash,
+                FriendlyName = scanner.FriendlyName,
+                DeviceInstanceIdHash = scanner.DeviceInstanceIdHash
+            })
             .ToArray();
 
     private static string Fingerprint(IReadOnlyList<ScannerInventoryEntry> entries)

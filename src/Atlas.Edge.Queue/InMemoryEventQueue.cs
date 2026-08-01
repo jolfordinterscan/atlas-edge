@@ -64,6 +64,19 @@ public sealed class InMemoryEventQueue : IEventQueue
         }
     }
 
+    public Task AcknowledgeInventoryAsync(string eventId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_inventorySync)
+        {
+            if (string.Equals(_latestInventory?.Event.EventId, eventId, StringComparison.Ordinal))
+            {
+                _latestInventory = null;
+            }
+        }
+        return Task.CompletedTask;
+    }
+
     public Task<IReadOnlyList<QueueItem<AgentHeartbeatEvent>>> PeekBatchAsync(int batchSize, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

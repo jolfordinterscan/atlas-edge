@@ -122,7 +122,7 @@ public sealed class ConfigurationValidationTests
     }
 
     [Fact]
-    public void Validate_RejectsUnknownDiscoveryProviderAndTransportPublication()
+    public void Validate_RejectsUnknownDiscoveryProvider()
     {
         var options = new AtlasEdgeOptions
         {
@@ -134,7 +134,18 @@ public sealed class ConfigurationValidationTests
 
         Assert.True(result.Failed);
         Assert.Contains(result.Failures!, failure => failure.Contains("ScannerDiscoveryProviders", StringComparison.Ordinal));
-        Assert.Contains(result.Failures!, failure => failure.Contains("scanner.inventory", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Validate_AllowsTransportPublicationForCompatibleAtlasPlatform()
+    {
+        var options = new AtlasEdgeOptions
+        {
+            ScannerDiscoveryProviders = ["Wia"],
+            ScannerInventoryPublishMode = AtlasEdgeOptions.ScannerInventoryPublishModeTransport
+        };
+
+        Assert.True(new AtlasEdgeOptionsValidator().Validate(Options.DefaultName, options).Succeeded);
     }
 
     [Fact]

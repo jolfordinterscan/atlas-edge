@@ -12,6 +12,8 @@ public interface IEventQueue
 
     Task<ScannerInventoryEvent?> GetLatestInventoryAsync(CancellationToken cancellationToken);
 
+    Task AcknowledgeInventoryAsync(string eventId, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<QueueItem<AgentHeartbeatEvent>>> PeekBatchAsync(int batchSize, CancellationToken cancellationToken);
 
     Task AcknowledgeAsync(IEnumerable<string> receiptIds, CancellationToken cancellationToken);

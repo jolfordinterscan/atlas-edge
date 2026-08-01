@@ -66,8 +66,46 @@ public sealed class HttpEventTransport : IEventTransport
             : replay.Result;
     }
 
+    public async Task<TransportSendResult> SendInventoryAsync(
+        ScannerInventoryEvent inventory,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(inventory);
+        var leaseResult = await _credentialProvider.GetLeaseAsync(cancellationToken);
+        if (leaseResult.Lease is null)
+        {
+            return MapCredentialFailure(leaseResult);
+        }
+        var first = await SendPayloadOnceAsync([inventory], [inventory.EventId], leaseResult.Lease, cancellationToken);
+        if (!first.AccessTokenExpired)
+        {
+            return first.Result;
+        }
+        var refreshed = await _credentialProvider.RefreshAfterAccessTokenExpiredAsync(leaseResult.Lease.Generation, cancellationToken);
+        if (refreshed.Lease is null)
+        {
+            return MapCredentialFailure(refreshed);
+        }
+        var replay = await SendPayloadOnceAsync([inventory], [inventory.EventId], refreshed.Lease, cancellationToken);
+        return replay.AccessTokenExpired
+            ? TransportSendResult.Retryable("access_token_expired_after_refresh")
+            : replay.Result;
+    }
+
     private async Task<SendAttempt> SendOnceAsync(
         IReadOnlyList<QueueItem<AgentHeartbeatEvent>> batch,
+        CredentialLease lease,
+        CancellationToken cancellationToken) =>
+        await SendPayloadOnceAsync(
+            batch.Select(item => (object)item.Payload).ToArray(),
+            batch.Select(item => item.Payload.EventId).ToArray(),
+            lease,
+            cancellationToken);
+
+    private async Task<SendAttempt> SendPayloadOnceAsync(
+        IReadOnlyList<object> events,
+        IReadOnlyList<string> eventIds,
         CredentialLease lease,
         CancellationToken cancellationToken)
     {
@@ -89,7 +127,7 @@ public sealed class HttpEventTransport : IEventTransport
         request.Content = JsonContent.Create(new BatchRequest(
             lease.AgentId,
             lease.TenantBinding,
-            batch.Select(item => item.Payload).ToArray()), options: SerializerOptions);
+            events), options: SerializerOptions);
 
         try
         {
@@ -148,7 +186,7 @@ public sealed class HttpEventTransport : IEventTransport
             if (response.StatusCode == HttpStatusCode.Conflict &&
                 string.Equals(errorCode, "duplicate_event_id", StringComparison.Ordinal))
             {
-                return SendAttempt.Completed(TransportSendResult.Success(batch.Select(item => item.Payload.EventId)));
+                return SendAttempt.Completed(TransportSendResult.Success(eventIds));
             }
 
             return SendAttempt.Completed(TransportSendResult.Retryable(errorCode, acceptedEventIds));
@@ -168,7 +206,7 @@ public sealed class HttpEventTransport : IEventTransport
             ? TransportSendResult.AuthenticationRequired(result.ErrorCode ?? "authentication_required")
             : TransportSendResult.Retryable(result.ErrorCode ?? "credential_unavailable");
 
-    private sealed record BatchRequest(string AgentId, string TenantBinding, IReadOnlyList<AgentHeartbeatEvent> Events);
+    private sealed record BatchRequest(string AgentId, string TenantBinding, IReadOnlyList<object> Events);
 
     private sealed record BatchResponse(string[] AcceptedEventIds, string? ErrorCode, string? Message);
 

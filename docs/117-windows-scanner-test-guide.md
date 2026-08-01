@@ -41,6 +41,10 @@ dotnet run -c Release --project .\src\Atlas.Edge.Runtime\Atlas.Edge.Runtime.cspr
 
 Stop gracefully with `Ctrl+C`. To capture sanitized console logs:
 
+Use `Transport` instead of `QueueOnly` only with an enrolled runtime configured
+for an Atlas Platform version that accepts `scanner.inventory` schema `1.0`.
+Keep `QueueOnly` for scanner-probe and discovery-only verification.
+
 ```powershell
 dotnet run -c Release --project .\src\Atlas.Edge.Runtime\Atlas.Edge.Runtime.csproj *>&1 |
   Tee-Object -FilePath .\atlas-edge-scanner-discovery.log

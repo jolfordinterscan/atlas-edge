@@ -169,13 +169,6 @@ public sealed class AtlasEdgeOptionsValidator : IValidateOptions<AtlasEdgeOption
             errors.Add("ScannerInventoryPublishMode must be Disabled, QueueOnly, or Transport.");
         }
 
-        if (string.Equals(
-            options.ScannerInventoryPublishMode,
-            AtlasEdgeOptions.ScannerInventoryPublishModeTransport,
-            StringComparison.OrdinalIgnoreCase))
-        {
-            errors.Add("ScannerInventoryPublishMode Transport is unavailable until Atlas Platform accepts scanner.inventory.");
-        }
 
         if (!string.Equals(
                 options.ScannerHealthProvider,

@@ -30,6 +30,17 @@ public sealed record ScannerInventoryEntry(
     DateTimeOffset FirstObservedUtc,
     DateTimeOffset LastObservedUtc,
     string MetadataConfidence,
-    IReadOnlyList<string> DiscoveryWarnings);
+    IReadOnlyList<string> DiscoveryWarnings)
+{
+    public string? SerialSource { get; init; }
+    public string? HardwareId { get; init; }
+    public string? DriverProvider { get; init; }
+    public string? UsbVendorId { get; init; }
+    public string? UsbProductId { get; init; }
+    public string? ContainerId { get; init; }
+    public string? LocationPathHash { get; init; }
+    public string? FriendlyName { get; init; }
+    public string? DeviceInstanceIdHash { get; init; }
+}
 
 public sealed record ScannerInventoryEnqueueResult(string ReceiptId, bool WasQueued);

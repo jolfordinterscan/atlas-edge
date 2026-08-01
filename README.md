@@ -51,7 +51,7 @@ This repository is at the secure local enrollment checkpoint stage.
 - Expired access-token responses refresh and replay once; permanent authentication failures retain queued telemetry
 - Read-only periodic scanner inventory discovery is implemented with WIA as the conservative default Windows provider
 - Scanner inventory uses stable hashed identity, bounded normalized metadata, conservative status, provider timeouts, and failure isolation
-- Changed inventories produce one coalesced local `scanner.inventory` event; the event is never sent because Atlas Platform currently accepts only heartbeats
+- Changed inventories produce one coalesced `scanner.inventory` event; `Transport` mode sends it only to an authenticated compatible Atlas Platform while preserving heartbeat isolation
 - Read-only scanner health collection preserves unknown metrics and calculates evidence-based category scores
 - macOS credential storage is development-only and uses protected local persistence
 - Windows protected credential storage remains required before pilot release
@@ -101,8 +101,10 @@ HTTPS is required by default for enrollment and ingestion. For an HTTP-only loca
 
 Token refresh defaults to five minutes before access-token expiry with 30 seconds of clock-skew tolerance. Refresh timing and bounded retry settings are available under the `AtlasEdge` configuration section. Raw tokens, Authorization headers, and response bodies are never logged; diagnostics use truncated SHA-256 fingerprints and stable error codes.
 
-Scanner discovery runs independently at a bounded interval when `AtlasEdge:ScannerDiscoveryEnabled` is `true`. The default `Platform` mode enables only WIA; optional installed-source TWAIN and ISIS metadata providers must be explicitly listed in `ScannerDiscoveryProviders`. The `Mock` provider returns an obvious local test device and is rejected unless `AtlasEdge:EnvironmentName` is `Development`. `ScannerInventoryPublishMode` defaults to `QueueOnly`, which coalesces the latest changed inventory inside the local queue while heartbeat batches remain transportable. `Transport` is rejected until Atlas Platform supports `scanner.inventory`.
+Scanner discovery runs independently at a bounded interval when `AtlasEdge:ScannerDiscoveryEnabled` is `true`. The default `Platform` mode enables only WIA; optional installed-source TWAIN and ISIS metadata providers must be explicitly listed in `ScannerDiscoveryProviders`. The `Mock` provider returns an obvious local test device and is rejected unless `AtlasEdge:EnvironmentName` is `Development`. `ScannerInventoryPublishMode` defaults to `QueueOnly`, which coalesces the latest changed inventory inside the local queue while heartbeat batches remain transportable. Set it to `Transport` only when the configured Atlas Platform supports `scanner.inventory` schema `1.0`. The pending slot is in memory and can be lost on restart.
 
 On Windows, run the safe read-only probe with `dotnet run -c Release --project tools/Atlas.Edge.ScannerProbe/Atlas.Edge.ScannerProbe.csproj`. It enumerates WIA scanner-class devices, masks serial numbers, does not open a device or acquisition session, and never transmits.
+
+Windows scanner identity enrichment correlates existing WIA records with read-only, allowlisted Windows PnP and Still Image registry metadata. Raw device instance IDs, hardware identifiers, container IDs, and location paths never enter the normalized model; Atlas retains SHA-256 values. Driver, USB VID/PID, friendly name, and serial are populated only when Windows exposes them and correlation is unambiguous. See [docs/118-windows-scanner-identity.md](docs/118-windows-scanner-identity.md).
 
 Scanner health collection also runs once at startup when `AtlasEdge:ScannerHealthEnabled` is `true`. Platform providers retain absent or invalid metrics as unknown. The health `Mock` provider is restricted to Development and publishes only obvious synthetic values.

@@ -3,6 +3,7 @@ using Atlas.Edge.ScannerDiscovery;
 using Atlas.Edge.Configuration;
 using Atlas.Edge.Core;
 using Atlas.Edge.Queue;
+using Atlas.Edge.Transport;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -60,10 +61,72 @@ public sealed class ScannerDiscoveryRuntimeTests
         Assert.Null(inventory.Current);
     }
 
+    [Fact]
+    public async Task TransportMode_AcknowledgesAcceptedChangedInventory()
+    {
+        var snapshot = CreateSnapshot("fi-8170");
+        var queue = new InMemoryEventQueue();
+        var transport = new RecordingTransport(TransportFailureKind.None);
+        var service = CreateHostedService(
+            new StaticDiscoveryService(snapshot),
+            new ScannerInventoryState(),
+            queue,
+            AtlasEdgeOptions.ScannerInventoryPublishModeTransport,
+            transport);
+
+        await service.RunCycleAsync(CancellationToken.None);
+
+        Assert.Equal(1, transport.InventorySendCount);
+        Assert.Null(await queue.GetLatestInventoryAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task TransportMode_RetainsTransientFailureAndRetriesWithoutNewSnapshot()
+    {
+        var snapshot = CreateSnapshot("fi-8170");
+        var queue = new InMemoryEventQueue();
+        var transport = new RecordingTransport(TransportFailureKind.Retryable);
+        var service = CreateHostedService(
+            new StaticDiscoveryService(snapshot),
+            new ScannerInventoryState(),
+            queue,
+            AtlasEdgeOptions.ScannerInventoryPublishModeTransport,
+            transport);
+
+        await service.RunCycleAsync(CancellationToken.None);
+        await service.RunCycleAsync(CancellationToken.None);
+
+        Assert.Equal(2, transport.InventorySendCount);
+        Assert.NotNull(await queue.GetLatestInventoryAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task TransportMode_DropsPermanentInventoryRejectionWithoutTouchingHeartbeatQueue()
+    {
+        var queue = new InMemoryEventQueue();
+        var heartbeat = new AgentHeartbeatEvent(
+            "heartbeat", "agent.heartbeat", "1.0", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow,
+            "agent-test", "workstation-test", "tenant-test", "runtime", null, "Running");
+        await queue.EnqueueAsync(heartbeat, CancellationToken.None);
+        var service = CreateHostedService(
+            new StaticDiscoveryService(CreateSnapshot("fi-8170")),
+            new ScannerInventoryState(),
+            queue,
+            AtlasEdgeOptions.ScannerInventoryPublishModeTransport,
+            new RecordingTransport(TransportFailureKind.NonRetryable));
+
+        await service.RunCycleAsync(CancellationToken.None);
+
+        Assert.Null(await queue.GetLatestInventoryAsync(CancellationToken.None));
+        Assert.Single(await queue.PeekBatchAsync(10, CancellationToken.None));
+    }
+
     private static ScannerDiscoveryHostedService CreateHostedService(
         IScannerDiscoveryService discoveryService,
         ScannerInventoryState inventory,
-        IEventQueue queue)
+        IEventQueue queue,
+        string publishMode = AtlasEdgeOptions.ScannerInventoryPublishModeQueueOnly,
+        IEventTransport? transport = null)
     {
         var identityState = new RuntimeIdentityState();
         identityState.Update(new AgentIdentity(
@@ -77,7 +140,7 @@ public sealed class ScannerDiscoveryRuntimeTests
         {
             ScannerDiscoveryStartupDelaySeconds = 0,
             ScannerDiscoveryIntervalSeconds = 30,
-            ScannerInventoryPublishMode = AtlasEdgeOptions.ScannerInventoryPublishModeQueueOnly
+            ScannerInventoryPublishMode = publishMode
         });
         return new ScannerDiscoveryHostedService(
             discoveryService,
@@ -85,9 +148,21 @@ public sealed class ScannerDiscoveryRuntimeTests
             inventory,
             identityState,
             queue,
+            transport ?? new NullEventTransport(NullLogger<NullEventTransport>.Instance),
             options,
             TimeProvider.System,
             NullLogger<ScannerDiscoveryHostedService>.Instance);
+    }
+
+    private static ScannerDiscoverySnapshot CreateSnapshot(string model)
+    {
+        var now = DateTimeOffset.UtcNow;
+        return new ScannerDiscoverySnapshot(
+            now,
+            [new DiscoveredScanner(
+                "scanner-test", "FUJITSU", model, null, null, "USB", true, true, true,
+                ["Unknown"], [], ScannerOnlineStatus.Unknown, [ScannerProtocol.Wia])],
+            [new ScannerAdapterDiagnostic(ScannerProtocol.Wia, true, 1, null)]);
     }
 
     private static async Task WaitUntilAsync(Func<bool> predicate)
@@ -113,5 +188,28 @@ public sealed class ScannerDiscoveryRuntimeTests
     {
         public Task<ScannerDiscoverySnapshot> DiscoverAsync(CancellationToken cancellationToken) =>
             throw new InvalidOperationException("Platform failure");
+    }
+
+    private sealed class RecordingTransport(TransportFailureKind failureKind) : IEventTransport
+    {
+        public int InventorySendCount { get; private set; }
+
+        public Task<TransportSendResult> SendAsync(
+            IReadOnlyList<QueueItem<AgentHeartbeatEvent>> batch,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(TransportSendResult.Success(batch.Select(item => item.Payload.EventId)));
+
+        public Task<TransportSendResult> SendInventoryAsync(
+            ScannerInventoryEvent inventory,
+            CancellationToken cancellationToken)
+        {
+            InventorySendCount++;
+            return Task.FromResult(failureKind switch
+            {
+                TransportFailureKind.None => TransportSendResult.Success([inventory.EventId]),
+                TransportFailureKind.NonRetryable => TransportSendResult.NonRetryable("invalid_scanner_inventory"),
+                _ => TransportSendResult.Retryable("temporary_failure")
+            });
+        }
     }
 }

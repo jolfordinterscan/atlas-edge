@@ -103,6 +103,18 @@ if (scannerDiscoveryEnabled &&
     }
 
     builder.Services.AddSingleton<IScannerIdentityFactory, ScannerIdentityFactory>();
+    builder.Services.AddSingleton<IPnpScannerMetadataCatalog, WindowsPnpScannerMetadataCatalog>();
+    builder.Services.AddSingleton<IRegistryScannerMetadataCatalog, WindowsScannerRegistryMetadataCatalog>();
+    builder.Services.AddSingleton<IScannerMetadataProvider, WindowsPnpScannerMetadataProvider>();
+    builder.Services.AddSingleton<IScannerMetadataProvider, WindowsRegistryScannerMetadataProvider>();
+    builder.Services.AddSingleton<IScannerMetadataEnricher>(sp =>
+    {
+        var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<AtlasEdgeOptions>>().Value;
+        return new ScannerMetadataEnricher(
+            sp.GetServices<IScannerMetadataProvider>(),
+            sp.GetRequiredService<TimeProvider>(),
+            TimeSpan.FromSeconds(options.ScannerDiscoveryProviderTimeoutSeconds));
+    });
     builder.Services.AddSingleton<IScannerInventoryEventBuilder, ScannerInventoryEventBuilder>();
     builder.Services.AddSingleton<IScannerDiscoveryService>(sp =>
     {
@@ -112,7 +124,8 @@ if (scannerDiscoveryEnabled &&
             sp.GetRequiredService<TimeProvider>(),
             sp.GetRequiredService<ILogger<ScannerDiscoveryService>>(),
             sp.GetRequiredService<IScannerIdentityFactory>(),
-            TimeSpan.FromSeconds(options.ScannerDiscoveryProviderTimeoutSeconds));
+            TimeSpan.FromSeconds(options.ScannerDiscoveryProviderTimeoutSeconds),
+            sp.GetRequiredService<IScannerMetadataEnricher>());
     });
     builder.Services.AddHostedService<ScannerDiscoveryHostedService>();
 }

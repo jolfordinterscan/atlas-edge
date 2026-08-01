@@ -11,7 +11,7 @@ Atlas Edge performs bounded, read-only scanner inventory discovery independently
 5. A deterministic fingerprint excludes observation timestamps and ordering.
 6. In `QueueOnly` mode, a changed snapshot replaces the one local inventory event in the existing in-memory queue. An unchanged snapshot creates nothing.
 
-The heartbeat queue batch API returns heartbeat entries only. Local inventory therefore cannot reach HTTP transport, retry indefinitely, inflate heartbeat queue health, or block a heartbeat. `Transport` mode fails configuration validation until Atlas Platform explicitly accepts `scanner.inventory`.
+The heartbeat queue batch API returns heartbeat entries only, so inventory cannot inflate heartbeat queue health or block a heartbeat. `Transport` mode uses the same authenticated batch endpoint only when a compatible Atlas Platform accepts `scanner.inventory` schema `1.0`. Permanent inventory rejection removes only that inventory; transient and authentication failures retain the latest coalesced snapshot.
 
 ## Normalized inventory
 
@@ -51,7 +51,7 @@ On non-Windows systems all native catalogs report unavailable. Production code n
 }
 ```
 
-Intervals and timeouts are validated and bounded. `Disabled` updates no inventory event, `QueueOnly` retains one latest local event, and `Transport` is deliberately rejected.
+Intervals and timeouts are validated and bounded. `Disabled` creates no inventory event, `QueueOnly` retains one latest local event, and `Transport` submits that slot after runtime identity and authenticated transport are available.
 
 ## Inventory event contract
 
@@ -60,7 +60,7 @@ Intervals and timeouts are validated and bounded. `Disabled` updates no inventor
 ## Deferred work
 
 - Real Windows/Ricoh hardware verification.
-- Atlas Platform support and persistence for `scanner.inventory`.
+- Deployment of a compatible Atlas Platform scanner inventory schema is required before enabling `Transport`.
 - Durable inventory queueing across process restart.
 - Hot-plug notifications and provider-specific cancellation of a hung COM call.
 - TWAIN DSM enumeration or vendor SDKs.

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http;
 using System.Text;
+using System.Text.Json;
 using Atlas.Edge.Core;
 using Atlas.Edge.Security;
 using Atlas.Edge.Transport;
@@ -32,6 +33,33 @@ public sealed class HttpTransportTests
 
         Assert.True(result.IsSuccess);
         Assert.Contains(eventId, result.AcceptedEventIds);
+    }
+
+    [Fact]
+    public async Task AuthenticatedScannerInventoryDelivery_UsesExistingBatchContract()
+    {
+        var inventory = CreateInventory();
+        var transport = CreateTransport(new FakeHandler((request, _) =>
+        {
+            var payload = JsonDocument.Parse(request.Content!.ReadAsStringAsync().GetAwaiter().GetResult());
+            var sent = payload.RootElement.GetProperty("events")[0];
+            Assert.Equal("scanner.inventory", sent.GetProperty("eventType").GetString());
+            Assert.Equal(inventory.InventoryVersion, sent.GetProperty("inventoryVersion").GetString());
+            var scanner = sent.GetProperty("scanners")[0];
+            Assert.Equal("scanner-test", scanner.GetProperty("scannerId").GetString());
+            Assert.False(scanner.TryGetProperty("devicePath", out var rawDevicePath));
+            Assert.Equal(JsonValueKind.Undefined, rawDevicePath.ValueKind);
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent($"{{\"acceptedEventIds\":[\"{inventory.EventId}\"]}}", Encoding.UTF8, "application/json")
+            };
+        }));
+
+        var result = await transport.SendInventoryAsync(inventory, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Contains(inventory.EventId, result.AcceptedEventIds);
     }
 
     [Fact]
@@ -181,6 +209,37 @@ public sealed class HttpTransportTests
             null,
             null);
     }
+
+    private static ScannerInventoryEvent CreateInventory() =>
+        new(
+            "inventory-event",
+            "scanner.inventory",
+            "1.0",
+            DateTimeOffset.UtcNow,
+            "agent-1",
+            "device-1",
+            new string('a', 64),
+            1,
+            [new ScannerInventoryEntry(
+                "scanner-test",
+                "wia",
+                "WIA",
+                "FUJITSU",
+                "fi-8170",
+                null,
+                "device-path-sha256",
+                null,
+                null,
+                "Wia",
+                "Usb",
+                null,
+                "Unknown",
+                true,
+                ["Unknown"],
+                DateTimeOffset.UtcNow.AddMinutes(-1),
+                DateTimeOffset.UtcNow,
+                "StandardProtocol",
+                [])]);
 
     private sealed class StaticCredentialProvider : ITransportCredentialProvider
     {

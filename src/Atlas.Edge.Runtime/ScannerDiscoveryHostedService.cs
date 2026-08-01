@@ -1,6 +1,7 @@
 using Atlas.Edge.Configuration;
 using Atlas.Edge.Queue;
 using Atlas.Edge.ScannerDiscovery;
+using Atlas.Edge.Transport;
 using Microsoft.Extensions.Options;
 
 namespace Atlas.Edge.Runtime;
@@ -14,6 +15,7 @@ public sealed class ScannerDiscoveryHostedService : BackgroundService
     private readonly ILogger<ScannerDiscoveryHostedService> _logger;
     private readonly AtlasEdgeOptions _options;
     private readonly IEventQueue _queue;
+    private readonly IEventTransport _transport;
     private readonly TimeProvider _timeProvider;
 
     public ScannerDiscoveryHostedService(
@@ -22,6 +24,7 @@ public sealed class ScannerDiscoveryHostedService : BackgroundService
         ScannerInventoryState inventoryState,
         RuntimeIdentityState identityState,
         IEventQueue queue,
+        IEventTransport transport,
         IOptions<AtlasEdgeOptions> options,
         TimeProvider timeProvider,
         ILogger<ScannerDiscoveryHostedService> logger)
@@ -31,6 +34,7 @@ public sealed class ScannerDiscoveryHostedService : BackgroundService
         _inventoryState = inventoryState;
         _identityState = identityState;
         _queue = queue;
+        _transport = transport;
         _options = options.Value;
         _timeProvider = timeProvider;
         _logger = logger;
@@ -111,13 +115,18 @@ public sealed class ScannerDiscoveryHostedService : BackgroundService
             return;
         }
 
-        if (!string.Equals(
+        var queueOnly = string.Equals(
             _options.ScannerInventoryPublishMode,
             AtlasEdgeOptions.ScannerInventoryPublishModeQueueOnly,
-            StringComparison.OrdinalIgnoreCase))
+            StringComparison.OrdinalIgnoreCase);
+        var transport = string.Equals(
+            _options.ScannerInventoryPublishMode,
+            AtlasEdgeOptions.ScannerInventoryPublishModeTransport,
+            StringComparison.OrdinalIgnoreCase);
+        if (!queueOnly && !transport)
         {
             _logger.LogWarning(
-                "Scanner inventory publication mode is not locally safe; inventory was not queued.");
+                "Scanner inventory publication mode is unsupported; inventory was not queued.");
             return;
         }
 
@@ -129,11 +138,42 @@ public sealed class ScannerDiscoveryHostedService : BackgroundService
             return;
         }
 
-        var result = await _queue.EnqueueInventoryAsync(
+        var enqueueResult = await _queue.EnqueueInventoryAsync(
             _eventBuilder.Build(snapshot, identity),
             cancellationToken);
-        _logger.LogInformation(result.WasQueued
+        _logger.LogInformation(enqueueResult.WasQueued
             ? "Scanner inventory changed; queued local inventory event."
             : "Scanner inventory unchanged; no event created.");
+
+        if (!transport)
+        {
+            return;
+        }
+
+        var pending = await _queue.GetLatestInventoryAsync(cancellationToken);
+        if (pending is null)
+        {
+            return;
+        }
+
+        var sendResult = await _transport.SendInventoryAsync(pending, cancellationToken);
+        if (sendResult.IsSuccess && sendResult.AcceptedEventIds.Contains(pending.EventId))
+        {
+            await _queue.AcknowledgeInventoryAsync(pending.EventId, cancellationToken);
+            _logger.LogInformation("Scanner inventory event was accepted by Atlas.");
+        }
+        else if (sendResult.FailureKind == TransportFailureKind.NonRetryable)
+        {
+            await _queue.AcknowledgeInventoryAsync(pending.EventId, cancellationToken);
+            _logger.LogWarning(
+                "Scanner inventory event was permanently rejected with error code {ErrorCode}; heartbeat processing will continue.",
+                sendResult.Error);
+        }
+        else
+        {
+            _logger.LogInformation(
+                "Scanner inventory transmission is deferred with error code {ErrorCode}; the latest snapshot remains pending.",
+                sendResult.Error ?? "not_acknowledged");
+        }
     }
 }

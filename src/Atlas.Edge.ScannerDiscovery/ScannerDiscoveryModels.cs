@@ -76,6 +76,8 @@ public sealed record AdapterScannerDevice(
     public string? DevicePath { get; init; }
 
     public bool HasProviderStableIdentity { get; init; } = true;
+
+    public ScannerMetadata? EnrichedMetadata { get; init; }
 }
 
 public sealed record DiscoveredScanner(
@@ -112,6 +114,41 @@ public sealed record DiscoveredScanner(
     public IReadOnlyList<ScannerCapability> NormalizedCapabilities { get; init; } = [];
 
     public IReadOnlyList<string> DiscoveryWarnings { get; init; } = [];
+
+    public string? SerialSource { get; init; }
+
+    public string? HardwareId { get; init; }
+
+    public string? DriverProvider { get; init; }
+
+    public string? UsbVendorId { get; init; }
+
+    public string? UsbProductId { get; init; }
+
+    public string? ContainerId { get; init; }
+
+    public string? LocationPathHash { get; init; }
+
+    public string? FriendlyName { get; init; }
+
+    public string? DeviceInstanceIdHash { get; init; }
+}
+
+public sealed record ScannerMetadata(
+    string? SerialNumber,
+    string? SerialSource,
+    string? HardwareId,
+    string? DriverName,
+    string? DriverProvider,
+    string? DriverVersion,
+    string? UsbVendorId,
+    string? UsbProductId,
+    string? ContainerId,
+    string? LocationPathHash,
+    string? FriendlyName,
+    string? DeviceInstanceIdHash)
+{
+    public string? FirmwareVersion { get; init; }
 }
 
 public sealed record ScannerAdapterDiagnostic(

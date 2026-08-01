@@ -8,6 +8,7 @@ public sealed class ScannerDiscoveryService : IScannerDiscoveryService
     private readonly ILogger<ScannerDiscoveryService> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly IScannerIdentityFactory _identityFactory;
+    private readonly IScannerMetadataEnricher? _metadataEnricher;
     private readonly TimeSpan _providerTimeout;
     private readonly Dictionary<string, DateTimeOffset> _firstObserved = new(StringComparer.Ordinal);
 
@@ -24,12 +25,14 @@ public sealed class ScannerDiscoveryService : IScannerDiscoveryService
         TimeProvider timeProvider,
         ILogger<ScannerDiscoveryService> logger,
         IScannerIdentityFactory identityFactory,
-        TimeSpan providerTimeout)
+        TimeSpan providerTimeout,
+        IScannerMetadataEnricher? metadataEnricher = null)
     {
         _adapters = adapters.ToArray();
         _timeProvider = timeProvider;
         _logger = logger;
         _identityFactory = identityFactory;
+        _metadataEnricher = metadataEnricher;
         _providerTimeout = providerTimeout > TimeSpan.Zero
             ? providerTimeout
             : throw new ArgumentOutOfRangeException(nameof(providerTimeout));
@@ -83,10 +86,13 @@ public sealed class ScannerDiscoveryService : IScannerDiscoveryService
             });
         }
 
+        var enrichedDevices = _metadataEnricher is null
+            ? devices
+            : (await _metadataEnricher.EnrichAsync(devices, cancellationToken)).ToList();
         var observedAt = _timeProvider.GetUtcNow();
         return new ScannerDiscoverySnapshot(
             observedAt,
-            MergeDevices(devices, observedAt),
+            MergeDevices(enrichedDevices, observedAt),
             diagnostics.OrderBy(diagnostic => diagnostic.Protocol).ToArray());
     }
 
@@ -122,6 +128,7 @@ public sealed class ScannerDiscoveryService : IScannerDiscoveryService
             .First();
 
         var identity = _identityFactory.Create(preferred);
+        var metadata = preferred.EnrichedMetadata;
         var scannerId = identity.ScannerId;
         if (!_firstObserved.TryGetValue(scannerId, out var firstObserved))
         {
@@ -166,7 +173,17 @@ public sealed class ScannerDiscoveryService : IScannerDiscoveryService
             FirstObservedUtc = firstObserved,
             LastObservedUtc = observedAt,
             NormalizedCapabilities = NormalizeCapabilities(capabilities),
-            DiscoveryWarnings = []
+            DiscoveryWarnings = [],
+            SerialSource = metadata?.SerialSource,
+            HardwareId = metadata?.HardwareId,
+            DriverProvider = FirstValue(devices.Select(device => device.EnrichedMetadata?.DriverProvider)) ??
+                FirstValue(devices.Select(device => device.Driver.Provider)),
+            UsbVendorId = metadata?.UsbVendorId,
+            UsbProductId = metadata?.UsbProductId,
+            ContainerId = metadata?.ContainerId,
+            LocationPathHash = metadata?.LocationPathHash,
+            FriendlyName = metadata?.FriendlyName,
+            DeviceInstanceIdHash = metadata?.DeviceInstanceIdHash
         };
     }
 

@@ -29,4 +29,17 @@ public sealed class NullEventTransport : IEventTransport
 
         return Task.FromResult(TransportSendResult.Success(batch.Select(item => item.Payload.EventId)));
     }
+
+    public Task<TransportSendResult> SendInventoryAsync(
+        ScannerInventoryEvent inventory,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        _logger.LogInformation(
+            "Null transport received event {EventType} ({EventId}) for agent {AgentId}.",
+            inventory.EventType,
+            inventory.EventId,
+            inventory.AgentId);
+        return Task.FromResult(TransportSendResult.Success([inventory.EventId]));
+    }
 }
