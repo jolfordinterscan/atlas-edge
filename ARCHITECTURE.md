@@ -34,5 +34,13 @@ Scanner or Capture Application
 
 ## Current Stage
 
-This repository documents contracts and architecture only.
-No production service implementation is included yet.
+This repository now includes a .NET 8 Windows runtime foundation checkpoint.
+The runtime supports configuration validation, temporary development identity creation, heartbeat generation, in-memory queueing, null transport delivery, structured logging, and graceful shutdown.
+
+The following remain intentionally unimplemented at this checkpoint:
+
+- Enrollment
+- Secure per-device production identity
+- Real Atlas HTTPS transport
+- Scanner discovery
+- Page-count collection

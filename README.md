@@ -38,13 +38,14 @@ Atlas Platform is responsible for:
 
 ## Current Status
 
-This repository is at the foundation checkpoint stage.
+This repository is at the runtime foundation checkpoint stage.
 
 - Product boundaries are documented
 - Architecture and contracts are documented
 - Event families are defined at a minimum-contract level
 - Placeholder schemas are created with TODO markers
-- No production runtime implementation exists yet
+- A .NET 8 runtime foundation now exists for development validation
+- Enrollment, secure identity, Atlas transport, scanner discovery, and page counts remain unimplemented
 
 ## US-First Deployment Scope
 
@@ -70,5 +71,5 @@ See [REPOSITORY-MAP.md](REPOSITORY-MAP.md) for the complete repository map.
 
 ## Important Note
 
-This repository currently contains product and architectural groundwork only.
-No production code is implemented yet.
+This repository now contains the first executable Atlas Edge runtime foundation.
+It does not yet implement enrollment, production identity, real HTTPS transport, scanner discovery, or page-count collection.

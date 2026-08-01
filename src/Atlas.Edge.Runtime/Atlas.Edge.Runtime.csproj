@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Atlas.Edge.Configuration\Atlas.Edge.Configuration.csproj" />
+    <ProjectReference Include="..\Atlas.Edge.Core\Atlas.Edge.Core.csproj" />
+    <ProjectReference Include="..\Atlas.Edge.Queue\Atlas.Edge.Queue.csproj" />
+    <ProjectReference Include="..\Atlas.Edge.Telemetry\Atlas.Edge.Telemetry.csproj" />
+    <ProjectReference Include="..\Atlas.Edge.Transport\Atlas.Edge.Transport.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+</Project>
