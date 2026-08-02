@@ -283,6 +283,94 @@ public sealed class RicohSerialProbeTests
     }
 
     [Fact]
+    public void MachineWideGate_AcquiresWhenFree()
+    {
+        var gate = NewMachineWideGate();
+
+        using var lease = gate.TryAcquire();
+
+        Assert.NotNull(lease);
+    }
+
+    [Fact]
+    public void MachineWideGate_SecondAcquisitionFailsWhileLeaseIsHeld()
+    {
+        var name = NewGateName();
+        var firstGate = new MachineWideRicohSessionGate(name);
+        var secondGate = new MachineWideRicohSessionGate(name);
+        using var lease = firstGate.TryAcquire();
+
+        var secondLease = secondGate.TryAcquire();
+
+        Assert.NotNull(lease);
+        Assert.Null(secondLease);
+    }
+
+    [Fact]
+    public void MachineWideGate_AcquiresAfterLeaseIsDisposed()
+    {
+        var name = NewGateName();
+        var firstGate = new MachineWideRicohSessionGate(name);
+        var secondGate = new MachineWideRicohSessionGate(name);
+        var lease = firstGate.TryAcquire();
+        Assert.NotNull(lease);
+        lease.Dispose();
+
+        using var nextLease = secondGate.TryAcquire();
+
+        Assert.NotNull(nextLease);
+    }
+
+    [Fact]
+    public void MachineWideGate_LeaseDisposalIsIdempotent()
+    {
+        var gate = NewMachineWideGate();
+        var lease = gate.TryAcquire();
+        Assert.NotNull(lease);
+
+        lease.Dispose();
+        lease.Dispose();
+
+        using var nextLease = gate.TryAcquire();
+        Assert.NotNull(nextLease);
+    }
+
+    [Fact]
+    public void MachineWideGate_LeaseCanBeDisposedFromDifferentThread()
+    {
+        var gate = NewMachineWideGate();
+        var lease = gate.TryAcquire() ?? throw new InvalidOperationException("Gate was not acquired.");
+        var acquisitionThread = Environment.CurrentManagedThreadId;
+        var disposalThread = acquisitionThread;
+
+        var thread = new Thread(() =>
+        {
+            disposalThread = Environment.CurrentManagedThreadId;
+            lease.Dispose();
+        });
+        thread.Start();
+        thread.Join();
+
+        Assert.NotEqual(acquisitionThread, disposalThread);
+        using var nextLease = gate.TryAcquire();
+        Assert.NotNull(nextLease);
+    }
+
+    [Fact]
+    public async Task MachineWideGate_ConcurrentGateInstancesFailFast()
+    {
+        var name = NewGateName();
+        var firstGate = new MachineWideRicohSessionGate(name);
+        var secondGate = new MachineWideRicohSessionGate(name);
+        using var lease = firstGate.TryAcquire();
+        Assert.NotNull(lease);
+
+        var secondLease = await Task.Run(secondGate.TryAcquire);
+
+        Assert.Null(secondLease);
+    }
+
+    [Fact]
     public void SerialMask_ShowsOnlyLastFourCharacters()
     {
         var validator = new RicohSerialValidator();
@@ -345,6 +433,10 @@ public sealed class RicohSerialProbeTests
             Assert.DoesNotContain(name, exposedNames);
         }
     }
+
+    private static MachineWideRicohSessionGate NewMachineWideGate() => new(NewGateName());
+
+    private static string NewGateName() => $"InterScan.AtlasEdge.RicohSdk.Tests.{Guid.NewGuid():N}";
 
     private sealed record Fixture(
         RicohSerialProbe Probe,

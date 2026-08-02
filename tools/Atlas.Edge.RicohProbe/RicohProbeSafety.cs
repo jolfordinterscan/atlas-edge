@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Collections.Concurrent;
 using Microsoft.Win32;
 
 namespace Atlas.Edge.RicohProbe;
@@ -34,50 +35,69 @@ public sealed class WindowsRicohRuntimeAvailability(bool sdkBuildEnabled) : IRic
         string.IsNullOrWhiteSpace(value) || value.Length > 64 ? "Unknown" : value.Trim();
 }
 
-public sealed class MachineWideRicohSessionGate : IRicohSessionGate
+public sealed class MachineWideRicohSessionGate(string? gateName = null) : IRicohSessionGate
 {
-    private const string WindowsMutexName = @"Global\InterScan.AtlasEdge.RicohSdk";
-    private const string PortableMutexName = "InterScan.AtlasEdge.RicohSdk";
+    private const string WindowsSemaphoreName = @"Global\InterScan.AtlasEdge.RicohSdk";
+    private const string PortableSemaphoreName = "InterScan.AtlasEdge.RicohSdk";
+    private static readonly ConcurrentDictionary<string, Semaphore> PortableSemaphores = new(StringComparer.Ordinal);
+
+    private readonly string name = gateName ??
+        (OperatingSystem.IsWindows() ? WindowsSemaphoreName : PortableSemaphoreName);
 
     public IDisposable? TryAcquire()
     {
-        Mutex? mutex = null;
+        var ownsHandle = OperatingSystem.IsWindows();
+        var semaphore = ownsHandle
+            ? new Semaphore(1, 1, name)
+            : PortableSemaphores.GetOrAdd(name, _ => new Semaphore(1, 1));
         try
         {
-            mutex = new Mutex(false, OperatingSystem.IsWindows() ? WindowsMutexName : PortableMutexName);
-            if (!mutex.WaitOne(TimeSpan.Zero))
+            if (!semaphore.WaitOne(TimeSpan.Zero))
             {
-                mutex.Dispose();
+                if (ownsHandle)
+                {
+                    semaphore.Dispose();
+                }
+
                 return null;
             }
 
-            return new MutexLease(mutex);
+            return new SemaphoreLease(semaphore, ownsHandle);
         }
-        catch (AbandonedMutexException)
+        catch
         {
-            return mutex is null ? null : new MutexLease(mutex);
-        }
-        catch (Exception exception) when (exception is UnauthorizedAccessException or IOException)
-        {
-            mutex?.Dispose();
-            return null;
+            if (ownsHandle)
+            {
+                semaphore.Dispose();
+            }
+
+            throw;
         }
     }
 
-    private sealed class MutexLease(Mutex mutex) : IDisposable
+    private sealed class SemaphoreLease(Semaphore semaphore, bool ownsHandle) : IDisposable
     {
-        private bool disposed;
+        private Semaphore? current = semaphore;
 
         public void Dispose()
         {
-            if (disposed)
+            var acquired = Interlocked.Exchange(ref current, null);
+            if (acquired is null)
             {
                 return;
             }
 
-            disposed = true;
-            mutex.ReleaseMutex();
-            mutex.Dispose();
+            try
+            {
+                acquired.Release();
+            }
+            finally
+            {
+                if (ownsHandle)
+                {
+                    acquired.Dispose();
+                }
+            }
         }
     }
 }
