@@ -670,7 +670,3 @@ public sealed class WindowsScannerRegistryMetadataCatalog : IRegistryScannerMeta
         _ => []
     };
 }
-
-public interface IVendorScannerMetadataProvider : IScannerMetadataProvider
-{
-}

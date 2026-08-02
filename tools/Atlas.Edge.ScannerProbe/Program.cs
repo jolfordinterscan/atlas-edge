@@ -21,6 +21,55 @@ var service = new ScannerDiscoveryService(
     timeout,
     metadataEnricher);
 
+VendorInstallationSnapshot vendorInstallations;
+using (var vendorCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(15)))
+{
+    try
+    {
+        vendorInstallations = await VendorInstallationCatalog.CreateWindowsDefault()
+            .DiscoverAsync(vendorCancellation.Token);
+    }
+    catch (OperationCanceledException)
+    {
+        vendorInstallations = new VendorInstallationSnapshot(
+            false,
+            [],
+            [new VendorInstallationDiagnostic("vendor_probe_timeout", "WindowsVendorInstallationSource")]);
+    }
+}
+
+Console.WriteLine();
+Console.WriteLine($"Vendor installation catalog available: {vendorInstallations.IsAvailable}");
+Console.WriteLine($"Installed vendor components: {vendorInstallations.Installations.Count}");
+foreach (var installation in vendorInstallations.Installations)
+{
+    Console.WriteLine();
+    Console.WriteLine($"Vendor component: {installation.Vendor}");
+    Console.WriteLine($"Product: {installation.ProductName}");
+    Console.WriteLine($"Version: {Value(installation.Version)}");
+    Console.WriteLine($"Install path: {installation.InstallPath}");
+    Console.WriteLine($"Architecture: {installation.Architecture}");
+    Console.WriteLine($"Discovery source: {installation.Source}");
+    Console.WriteLine($"SDK candidates: {installation.SdkCandidates.Count}");
+    foreach (var candidate in installation.SdkCandidates)
+    {
+        Console.WriteLine($"  {candidate.Name} ({candidate.InterfaceKind}, {candidate.Architecture}, {Value(candidate.Version)})");
+    }
+}
+
+foreach (var provider in VendorMetadataProviderFactory.CreateDetectionProviders())
+{
+    var status = provider.Detect(vendorInstallations);
+    Console.WriteLine();
+    Console.WriteLine($"Vendor Provider: {status.ProviderName}");
+    Console.WriteLine($"Installed: {(status.IsInstalled ? "Yes" : "No")}");
+    Console.WriteLine($"Provider availability: {status.Availability}");
+    Console.WriteLine($"Metadata Available: {FormatFields(status, VendorMetadataAvailability.Available)}");
+    Console.WriteLine($"Unavailable: {FormatFields(status, VendorMetadataAvailability.Unavailable)}");
+    Console.WriteLine($"Unsupported: {FormatFields(status, VendorMetadataAvailability.Unsupported)}");
+    Console.WriteLine($"Unknown: {FormatFields(status, VendorMetadataAvailability.Unknown)}");
+}
+
 using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(20));
 try
 {
@@ -86,3 +135,12 @@ static string Value(string? value) => string.IsNullOrWhiteSpace(value) ? "Unknow
 
 static string FormatValues(IReadOnlyList<string> values) =>
     values.Count == 0 ? "None" : string.Join(", ", values);
+
+static string FormatFields(VendorMetadataProviderStatus status, VendorMetadataAvailability availability)
+{
+    var fields = status.Capabilities
+        .Where(value => value.Availability == availability)
+        .Select(value => value.Field)
+        .ToArray();
+    return fields.Length == 0 ? "None" : string.Join(", ", fields);
+}

@@ -1,6 +1,6 @@
 # Atlas Edge Version
 
-- Product checkpoint: Windows PnP Scanner Correlation
-- Repository version: 0.6.0-windows-pnp-correlation
+- Product checkpoint: Vendor Metadata Provider Foundation
+- Repository version: 0.6.0-vendor-metadata-foundation
 - Date: 2026-08-01
-- Status: secure enrollment, token refresh, authenticated heartbeat and compatible scanner inventory transport, periodic read-only WIA discovery, conservative Windows PnP and allowlisted registry identity enrichment with uniqueness-gated fallback correlation, coalesced inventory events, normalized health collection, and evidence-based health scoring are implemented; post-fix real Windows enrichment results, durable inventory queueing, Windows protected credential storage, page counts, scanner commands, and remote control remain unverified or unimplemented
+- Status: secure enrollment, token refresh, authenticated heartbeat and compatible scanner inventory transport, periodic read-only WIA discovery, validated Windows PnP identity enrichment, and a read-only vendor installation/capability-detection foundation are implemented; proprietary vendor metadata access, durable inventory queueing, Windows protected credential storage, page counts, scanner commands, and remote control remain unverified or unimplemented
