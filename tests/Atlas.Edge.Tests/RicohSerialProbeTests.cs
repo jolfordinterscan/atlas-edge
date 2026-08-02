@@ -172,7 +172,7 @@ public sealed class RicohSerialProbeTests
 
         Assert.Equal(RicohProbeError.OpenFailed, result.DiagnosticCode);
         Assert.Equal(0x1D, result.OpenErrorCode);
-        Assert.Equal(["sources", "selected-source", "select", "select-error", "open", "open-error"], fixture.Session.Actions);
+        Assert.Equal(["sources", "select", "select-error", "open", "open-error"], fixture.Session.Actions);
         Assert.Equal(0, fixture.Session.SerialReadCount);
         Assert.Equal(0, fixture.Session.CloseCount);
     }
@@ -440,12 +440,6 @@ public sealed class RicohSerialProbeTests
         {
             Actions.Add("select");
             return 0;
-        }
-
-        public string? GetSelectedSource()
-        {
-            Actions.Add("selected-source");
-            return Sources.FirstOrDefault();
         }
 
         public int OpenScanner(int windowHandle)

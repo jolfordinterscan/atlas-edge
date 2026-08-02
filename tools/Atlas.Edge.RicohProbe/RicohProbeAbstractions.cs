@@ -13,8 +13,6 @@ public interface IRicohScannerControlSession
 
     IReadOnlyList<string> GetSources();
 
-    string? GetSelectedSource();
-
     int SelectSourceName(string sourceName);
 
     int OpenScanner(int windowHandle);

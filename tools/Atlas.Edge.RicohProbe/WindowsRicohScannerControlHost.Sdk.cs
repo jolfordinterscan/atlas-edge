@@ -177,8 +177,6 @@ public sealed class WindowsRicohScannerControlHost : IRicohScannerControlHost
             return sources;
         }
 
-        public string? GetSelectedSource() => control.GetSourceSelect();
-
         public int SelectSourceName(string sourceName) => control.SelectSourceName(sourceName);
 
         public int OpenScanner(int containingWindowHandle) => control.OpenScanner(containingWindowHandle);

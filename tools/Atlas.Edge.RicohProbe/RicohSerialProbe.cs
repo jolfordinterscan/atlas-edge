@@ -95,7 +95,6 @@ public sealed class RicohSerialProbe(
                 .Distinct(StringComparer.Ordinal)
                 .Take(64)
                 .ToArray();
-            _ = SanitizeSourceName(session.GetSelectedSource());
         }
         catch
         {
