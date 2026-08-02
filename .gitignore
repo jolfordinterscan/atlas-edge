@@ -29,3 +29,6 @@ node_modules/
 # Python-related (if tooling is introduced)
 __pycache__/
 *.pyc
+
+# Proprietary Ricoh SDK
+vendor/ricoh-sdk/

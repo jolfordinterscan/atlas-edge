@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework Condition="'$(EnableRicohSdk)' != 'true'">net8.0</TargetFramework>
+    <TargetFramework Condition="'$(EnableRicohSdk)' == 'true'">net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableRicohSdk Condition="'$(EnableRicohSdk)' == ''">false</EnableRicohSdk>
+    <DefineConstants Condition="'$(EnableRicohSdk)' == 'true'">$(DefineConstants);RICOH_SDK</DefineConstants>
+    <UseWindowsForms Condition="'$(EnableRicohSdk)' == 'true'">true</UseWindowsForms>
+    <EnableWindowsTargeting Condition="'$(EnableRicohSdk)' == 'true'">true</EnableWindowsTargeting>
+    <PlatformTarget Condition="'$(EnableRicohSdk)' == 'true'">x64</PlatformTarget>
+    <RuntimeIdentifier Condition="'$(EnableRicohSdk)' == 'true'">win-x64</RuntimeIdentifier>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(EnableRicohSdk)' == 'true'">
+    <RicohAxInteropPath>$(RicohSdkRoot)\Sample\ScanTest\VCS 2017\x64\bin\Release\AxInterop.FiScnLib.dll</RicohAxInteropPath>
+    <RicohInteropPath>$(RicohSdkRoot)\Sample\ScanTest\VCS 2017\x64\bin\Release\Interop.FiScnLib.dll</RicohInteropPath>
+    <RicohSampleStatePath>$(RicohSdkRoot)\Sample\ScanTest\VCS 2017\FormScan.resx</RicohSampleStatePath>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(EnableRicohSdk)' == 'true'">
+    <Reference Include="AxInterop.FiScnLib">
+      <HintPath>$(RicohAxInteropPath)</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="Interop.FiScnLib">
+      <HintPath>$(RicohInteropPath)</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>RicohSdkRoot</_Parameter1>
+      <_Parameter2>$(RicohSdkRoot)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(EnableRicohSdk)' != 'true'">
+    <Compile Remove="WindowsRicohScannerControlHost.Sdk.cs" />
+  </ItemGroup>
+
+  <Target Name="ValidateRicohSdkReferences" BeforeTargets="ResolveReferences" Condition="'$(EnableRicohSdk)' == 'true'">
+    <Error Condition="'$(RicohSdkRoot)' == ''" Text="RicohSdkRoot is required when EnableRicohSdk=true." />
+    <Error Condition="!Exists('$(RicohAxInteropPath)')" Text="The x64 AxInterop.FiScnLib.dll reference was not found beneath RicohSdkRoot." />
+    <Error Condition="!Exists('$(RicohInteropPath)')" Text="The x64 Interop.FiScnLib.dll reference was not found beneath RicohSdkRoot." />
+    <Error Condition="!Exists('$(RicohSampleStatePath)')" Text="The official FormScan.resx ActiveX state was not found beneath RicohSdkRoot." />
+  </Target>
+</Project>

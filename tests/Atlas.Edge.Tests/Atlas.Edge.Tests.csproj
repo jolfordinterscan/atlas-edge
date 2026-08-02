@@ -40,6 +40,7 @@
     <ProjectReference Include="..\..\src\Atlas.Edge.Telemetry\Atlas.Edge.Telemetry.csproj" />
     <ProjectReference Include="..\..\src\Atlas.Edge.Transport\Atlas.Edge.Transport.csproj" />
     <ProjectReference Include="..\..\tools\Atlas.Edge.MockAtlasApi\Atlas.Edge.MockAtlasApi.csproj" />
+    <ProjectReference Include="..\..\tools\Atlas.Edge.RicohProbe\Atlas.Edge.RicohProbe.csproj" />
   </ItemGroup>
 
 </Project>

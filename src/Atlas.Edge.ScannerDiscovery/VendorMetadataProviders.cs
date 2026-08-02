@@ -138,7 +138,7 @@ public sealed class WindowsVendorInstallationSource : IVendorInstallationSource
     private const int MaximumPathLength = 1024;
     private static readonly string[] CandidateExtensions = [".dll", ".exe", ".ocx", ".tlb"];
     private static readonly string[] SdkMarkers =
-        ["sdk", "api", "scanner", "paperstream", "pfu", "ricoh", "fujitsu", "twain", "wia", "scansnap"];
+        ["sdk", "api", "scanner", "paperstream", "pfu", "ricoh", "fujitsu", "twain", "wia", "scansnap", "inotec", "datawin", "scamax"];
 
     public Task<VendorInstallationSnapshot> DiscoverAsync(CancellationToken cancellationToken)
     {
@@ -481,6 +481,9 @@ public sealed class WindowsVendorInstallationSource : IVendorInstallationSource
         vendor = string.Empty;
         if (string.IsNullOrWhiteSpace(text)) return false;
         if (text.Contains("PaperStream", StringComparison.OrdinalIgnoreCase)) vendor = "PaperStream";
+        else if (text.Contains("InoTec", StringComparison.OrdinalIgnoreCase) ||
+                 text.Contains("Datawin", StringComparison.OrdinalIgnoreCase) ||
+                 text.Contains("SCAMAX", StringComparison.OrdinalIgnoreCase)) vendor = "InoTec/Datawin";
         else if (text.Contains("RICOH", StringComparison.OrdinalIgnoreCase)) vendor = "Ricoh";
         else if (text.Contains("PFU", StringComparison.OrdinalIgnoreCase) ||
                  text.Contains("FUJITSU", StringComparison.OrdinalIgnoreCase) ||
