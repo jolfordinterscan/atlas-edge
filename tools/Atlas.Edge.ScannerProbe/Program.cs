@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 Console.WriteLine("Atlas Edge Scanner Probe");
 Console.WriteLine("Read-only enumeration; image acquisition and scanner commands are not available.");
+var metadataDiagnostics = args.Contains("--metadata-diagnostics", StringComparer.OrdinalIgnoreCase);
 
 var timeout = TimeSpan.FromSeconds(15);
 var metadataEnricher = new ScannerMetadataEnricher(
@@ -49,6 +50,25 @@ try
         Console.WriteLine($"Status: {scanner.Status}");
         Console.WriteLine($"Capabilities: {FormatCapabilities(scanner.NormalizedCapabilities)}");
         Console.WriteLine($"Stable Scanner ID: {scanner.DiscoveryId}");
+        if (metadataDiagnostics)
+        {
+            var matches = scanner.MetadataDiagnostics
+                .Where(value => value.MatchStrategy != "Unavailable")
+                .ToArray();
+            if (matches.Length == 0)
+            {
+                Console.WriteLine("Metadata match: None");
+            }
+            foreach (var match in matches)
+            {
+                Console.WriteLine($"Metadata match: {match.ProviderName}");
+                Console.WriteLine($"Match strategy: {match.MatchStrategy}");
+                Console.WriteLine($"Match score: {match.MatchScore}");
+                Console.WriteLine($"Candidates evaluated: {match.CandidatesEvaluated}");
+                Console.WriteLine($"Ambiguous: {match.IsAmbiguous}");
+                Console.WriteLine($"Populated fields: {FormatValues(match.PopulatedFields)}");
+            }
+        }
     }
 
     return 0;
@@ -63,3 +83,6 @@ static string FormatCapabilities(IReadOnlyList<ScannerCapability> capabilities) 
     capabilities.Count == 0 ? "Unknown" : string.Join(", ", capabilities);
 
 static string Value(string? value) => string.IsNullOrWhiteSpace(value) ? "Unknown" : value;
+
+static string FormatValues(IReadOnlyList<string> values) =>
+    values.Count == 0 ? "None" : string.Join(", ", values);

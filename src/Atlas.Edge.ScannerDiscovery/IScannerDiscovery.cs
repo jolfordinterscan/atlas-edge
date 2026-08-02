@@ -46,6 +46,8 @@ public sealed record ScannerMetadataProviderResult(
     ScannerMetadata? Metadata,
     string? ErrorCode)
 {
+    public ScannerMetadataMatchDiagnostic? Diagnostic { get; init; }
+
     public static ScannerMetadataProviderResult Available(ScannerMetadata? metadata) =>
         new(true, metadata, null);
 
@@ -55,6 +57,14 @@ public sealed record ScannerMetadataProviderResult(
     public static ScannerMetadataProviderResult Failed(string errorCode) =>
         new(true, null, errorCode);
 }
+
+public sealed record ScannerMetadataMatchDiagnostic(
+    string ProviderName,
+    string MatchStrategy,
+    int MatchScore,
+    int CandidatesEvaluated,
+    bool IsAmbiguous,
+    IReadOnlyList<string> PopulatedFields);
 
 public sealed record ScannerStableIdentity(
     string ScannerId,

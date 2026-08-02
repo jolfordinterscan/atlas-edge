@@ -183,7 +183,8 @@ public sealed class ScannerDiscoveryService : IScannerDiscoveryService
             ContainerId = metadata?.ContainerId,
             LocationPathHash = metadata?.LocationPathHash,
             FriendlyName = metadata?.FriendlyName,
-            DeviceInstanceIdHash = metadata?.DeviceInstanceIdHash
+            DeviceInstanceIdHash = metadata?.DeviceInstanceIdHash,
+            MetadataDiagnostics = devices.SelectMany(device => device.MetadataDiagnostics).ToArray()
         };
     }
 

@@ -78,6 +78,8 @@ public sealed record AdapterScannerDevice(
     public bool HasProviderStableIdentity { get; init; } = true;
 
     public ScannerMetadata? EnrichedMetadata { get; init; }
+
+    public IReadOnlyList<ScannerMetadataMatchDiagnostic> MetadataDiagnostics { get; init; } = [];
 }
 
 public sealed record DiscoveredScanner(
@@ -132,6 +134,8 @@ public sealed record DiscoveredScanner(
     public string? FriendlyName { get; init; }
 
     public string? DeviceInstanceIdHash { get; init; }
+
+    public IReadOnlyList<ScannerMetadataMatchDiagnostic> MetadataDiagnostics { get; init; } = [];
 }
 
 public sealed record ScannerMetadata(
