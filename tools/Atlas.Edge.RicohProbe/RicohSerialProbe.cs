@@ -8,7 +8,8 @@ public sealed class RicohSerialProbe(
     IRicohScannerControlHost host,
     IRicohSessionGate sessionGate,
     IRicohSerialValidator serialValidator,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IRicohSourceEnvironmentCatalog? sourceEnvironmentCatalog = null)
 {
     private const int Success = 0;
     private const int Failure = -1;
@@ -28,11 +29,6 @@ public sealed class RicohSerialProbe(
             return FailureResult(request, availability, started, RicohProbeError.ExplicitModeRequired);
         }
 
-        if (request.Operation == RicohProbeOperation.ListSources)
-        {
-            return FailureResult(request, availability, started, RicohProbeError.ListSourcesRequiresRead);
-        }
-
         var preflightError = PreflightError(availability);
         if (preflightError is not null)
         {
@@ -45,6 +41,15 @@ public sealed class RicohSerialProbe(
             {
                 Status = "Available"
             };
+        }
+
+        if (request.Operation == RicohProbeOperation.ListSources)
+        {
+            return await ExecuteSourceEnumerationAsync(
+                request,
+                availability,
+                started,
+                cancellationToken).ConfigureAwait(false);
         }
 
         var targetError = ValidateTarget(request);
@@ -77,6 +82,84 @@ public sealed class RicohSerialProbe(
         {
             return FailureResult(request, availability, started, RicohProbeError.UnhandledFailure);
         }
+    }
+
+    private async Task<RicohSerialProbeResult> ExecuteSourceEnumerationAsync(
+        RicohProbeRequest request,
+        RicohRuntimeAvailability availability,
+        long started,
+        CancellationToken cancellationToken)
+    {
+        using var gate = sessionGate.TryAcquire();
+        if (gate is null)
+        {
+            return FailureResult(request, availability, started, RicohProbeError.SessionActive);
+        }
+
+        try
+        {
+            var environment = request.Verbose
+                ? await (sourceEnvironmentCatalog ?? new NoOpRicohSourceEnvironmentCatalog())
+                    .InspectAsync(cancellationToken).ConfigureAwait(false)
+                : RicohSourceEnvironmentSnapshot.Empty;
+
+            return await host.RunAsync(
+                session => ExecuteSourceEnumeration(request, availability, started, session, environment),
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return FailureResult(request, availability, started, RicohProbeError.Timeout);
+        }
+        catch (RicohProbeHostException exception)
+        {
+            return FailureResult(request, availability, started, exception.DiagnosticCode);
+        }
+        catch
+        {
+            return FailureResult(request, availability, started, RicohProbeError.UnhandledFailure);
+        }
+    }
+
+    private RicohSerialProbeResult ExecuteSourceEnumeration(
+        RicohProbeRequest request,
+        RicohRuntimeAvailability availability,
+        long started,
+        IRicohScannerControlSession session,
+        RicohSourceEnvironmentSnapshot environment)
+    {
+        RicohSdkSourceEnumeration enumeration;
+        try
+        {
+            enumeration = session.EnumerateSources();
+        }
+        catch
+        {
+            return FailureResult(request, availability, started, RicohProbeError.SourceEnumerationFailed);
+        }
+
+        var sources = enumeration.Sources
+            .Select(source => new RicohSdkEnumeratedSource(source.Index, SanitizeSourceName(source.Name) ?? "Unknown"))
+            .Take(64)
+            .ToArray();
+        var normalized = enumeration with { Sources = sources };
+        var selectedSource = sources.SingleOrDefault(source => source.Index == enumeration.SelectedIndexResult)?.Name;
+        var failed = enumeration.CountResult < 0;
+
+        return BaseResult(request, availability, started) with
+        {
+            SourceCount = failed ? 0 : enumeration.CountResult,
+            Sources = sources.Select(source => source.Name).ToArray(),
+            SelectedSourceIndex = enumeration.SelectedIndexResult >= 0
+                ? enumeration.SelectedIndexResult
+                : null,
+            SelectedSource = selectedSource,
+            SdkSources = RicohSourceDiagnosticBuilder.Build(normalized, environment),
+            EnvironmentSources = request.Verbose ? environment : null,
+            EnumerationErrorCodeAvailable = false,
+            Status = failed ? "Failed" : "Success",
+            DiagnosticCode = failed ? RicohProbeError.SourceEnumerationFailed : null
+        };
     }
 
     private RicohSerialProbeResult ExecuteSession(
@@ -284,9 +367,9 @@ public sealed class RicohSerialProbe(
             return RicohProbeError.NotWindows;
         }
 
-        if (!availability.IsX64)
+        if (!availability.IsX64 && !availability.IsX86)
         {
-            return RicohProbeError.NotX64;
+            return RicohProbeError.UnsupportedArchitecture;
         }
 
         return !availability.IsRuntimeRegistered || !availability.IsSdkBuildEnabled
@@ -325,9 +408,11 @@ public sealed class RicohSerialProbe(
         new()
         {
             Operation = request.Operation.ToString(),
-            SdkAvailable = availability.IsWindows && availability.IsX64 &&
+            SdkAvailable = availability.IsWindows && (availability.IsX64 || availability.IsX86) &&
                 availability.IsRuntimeRegistered && availability.IsSdkBuildEnabled,
-            Architecture = availability.IsX64 ? "X64" : RuntimeInformationArchitecture(),
+            Architecture = availability.ProcessArchitecture == "Unknown"
+                ? RuntimeInformationArchitecture()
+                : availability.ProcessArchitecture,
             RuntimeVersion = availability.RuntimeVersion,
             DurationMs = (long)timeProvider.GetElapsedTime(started).TotalMilliseconds
         };

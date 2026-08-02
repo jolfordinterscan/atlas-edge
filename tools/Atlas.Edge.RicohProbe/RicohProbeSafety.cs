@@ -12,22 +12,24 @@ public sealed class WindowsRicohRuntimeAvailability(bool sdkBuildEnabled) : IRic
     public RicohRuntimeAvailability Inspect()
     {
         var isWindows = OperatingSystem.IsWindows();
-        var isX64 = RuntimeInformation.OSArchitecture == Architecture.X64;
+        var isX64 = RuntimeInformation.ProcessArchitecture == Architecture.X64;
+        var isX86 = RuntimeInformation.ProcessArchitecture == Architecture.X86;
         if (!isWindows)
         {
-            return new(false, isX64, false, sdkBuildEnabled);
+            return new(false, isX64, false, sdkBuildEnabled, IsX86: isX86);
         }
 
         try
         {
-            using var classes = RegistryKey.OpenBaseKey(RegistryHive.ClassesRoot, RegistryView.Registry64);
+            var registryView = isX86 ? RegistryView.Registry32 : RegistryView.Registry64;
+            using var classes = RegistryKey.OpenBaseKey(RegistryHive.ClassesRoot, registryView);
             using var clsid = classes.OpenSubKey($"CLSID\\{ActiveXClsid}", writable: false);
             var version = clsid?.GetValue("Version") as string;
-            return new(true, isX64, clsid is not null, sdkBuildEnabled, NormalizeVersion(version));
+            return new(true, isX64, clsid is not null, sdkBuildEnabled, NormalizeVersion(version), isX86);
         }
         catch (Exception exception) when (exception is UnauthorizedAccessException or IOException or System.Security.SecurityException)
         {
-            return new(true, isX64, false, sdkBuildEnabled);
+            return new(true, isX64, false, sdkBuildEnabled, IsX86: isX86);
         }
     }
 

@@ -16,14 +16,63 @@ public sealed record RicohProbeRequest(
     string? Manufacturer = null,
     string? Model = null,
     string? UsbVendorId = null,
-    string? UsbProductId = null);
+    string? UsbProductId = null,
+    bool Verbose = false);
+
+public sealed record RicohSdkEnumeratedSource(int Index, string Name);
+
+public sealed record RicohSdkSourceEnumeration(
+    int CountResult,
+    int SelectedIndexResult,
+    IReadOnlyList<RicohSdkEnumeratedSource> Sources);
+
+public sealed record RicohSourceDriverAssociation(
+    string EnvironmentSource,
+    string EnvironmentKind,
+    string DriverName,
+    string? DriverVersion,
+    string? DriverProvider,
+    string Architecture,
+    string MatchBasis);
+
+public sealed record RicohSdkSourceDiagnostic(
+    int Index,
+    string Name,
+    bool IsSelected,
+    string SourceType,
+    RicohSourceDriverAssociation? DriverAssociation,
+    int? SdkErrorCode,
+    bool SdkErrorCodeAvailable);
+
+public sealed record RicohEnvironmentSource(
+    string Kind,
+    string Name,
+    string Manufacturer,
+    string DriverName,
+    string? DriverVersion,
+    string? DriverProvider,
+    string Architecture);
+
+public sealed record RicohSourceEnvironmentSnapshot(
+    bool WiaAvailable,
+    bool PnpAvailable,
+    bool TwainAvailable,
+    IReadOnlyList<RicohEnvironmentSource> Sources,
+    IReadOnlyList<string> Diagnostics)
+{
+    public static RicohSourceEnvironmentSnapshot Empty { get; } = new(false, false, false, [], []);
+}
 
 public sealed record RicohRuntimeAvailability(
     bool IsWindows,
     bool IsX64,
     bool IsRuntimeRegistered,
     bool IsSdkBuildEnabled,
-    string RuntimeVersion = "Unknown");
+    string RuntimeVersion = "Unknown",
+    bool IsX86 = false)
+{
+    public string ProcessArchitecture => IsX64 ? "X64" : IsX86 ? "X86" : "Unknown";
+}
 
 public sealed record RicohSerialProbeResult
 {
@@ -34,6 +83,10 @@ public sealed record RicohSerialProbeResult
     public string RuntimeVersion { get; init; } = "Unknown";
     public int SourceCount { get; init; }
     public IReadOnlyList<string> Sources { get; init; } = [];
+    public int? SelectedSourceIndex { get; init; }
+    public IReadOnlyList<RicohSdkSourceDiagnostic> SdkSources { get; init; } = [];
+    public RicohSourceEnvironmentSnapshot? EnvironmentSources { get; init; }
+    public bool EnumerationErrorCodeAvailable { get; init; }
     public string? SelectedSource { get; init; }
     public int? OpenResult { get; init; }
     public int? OpenErrorCode { get; init; }
@@ -56,6 +109,7 @@ public static class RicohProbeError
     public const string ExplicitModeRequired = "ricoh_probe_explicit_mode_required";
     public const string NotWindows = "ricoh_probe_not_windows";
     public const string NotX64 = "ricoh_probe_not_x64";
+    public const string UnsupportedArchitecture = "ricoh_probe_unsupported_architecture";
     public const string SdkUnavailable = "ricoh_sdk_unavailable";
     public const string ActiveXCreationFailed = "ricoh_activex_creation_failed";
     public const string HiddenHostFailed = "ricoh_hidden_host_failed";
@@ -72,7 +126,7 @@ public static class RicohProbeError
     public const string Timeout = "ricoh_probe_timeout";
     public const string SessionActive = "ricoh_probe_session_active";
     public const string UnhandledFailure = "ricoh_probe_unhandled_failure";
-    public const string ListSourcesRequiresRead = "ricoh_probe_list_sources_requires_read_serial";
+    public const string SourceEnumerationFailed = "ricoh_source_enumeration_failed";
 }
 
 public static class RicohProbeJson

@@ -36,19 +36,78 @@ public sealed class RicohSerialProbeTests
     }
 
     [Fact]
-    public async Task ListSources_DoesNotInstantiateControl()
+    public async Task ListSources_UsesEnumerationOnlyAndNeverOpensScanner()
     {
         var fixture = Fixture.Create();
+        fixture.Session.Sources = ["InoTec Scamax USB3", "PaperStream IP fi-8170"];
+        fixture.Session.SelectedSourceIndex = 1;
 
         var result = await fixture.Probe.ExecuteAsync(new(RicohProbeOperation.ListSources));
 
-        Assert.Equal(RicohProbeError.ListSourcesRequiresRead, result.DiagnosticCode);
-        Assert.Equal(0, fixture.Host.RunCount);
+        Assert.Equal("Success", result.Status);
+        Assert.Equal(2, result.SourceCount);
+        Assert.Equal(1, result.SelectedSourceIndex);
+        Assert.Equal("PaperStream IP fi-8170", result.SelectedSource);
+        Assert.Equal(["enumerate"], fixture.Session.Actions);
+        Assert.Equal(0, fixture.Session.OpenCount);
+        Assert.Equal(0, fixture.Session.SerialReadCount);
+        Assert.Equal(0, fixture.Session.CloseCount);
+        Assert.Equal(0, fixture.Session.SelectCount);
+    }
+
+    [Fact]
+    public async Task VerboseListSources_ReportsEnvironmentAndUniqueDriverAssociation()
+    {
+        var environment = new RicohSourceEnvironmentSnapshot(
+            true,
+            true,
+            true,
+            [new("TWAIN", "PaperStream IP fi-8170", "FUJITSU", "fi-8170", "2.0.0.9", "FUJITSU", "X64")],
+            []);
+        var fixture = Fixture.Create(environment: environment);
+        fixture.Session.Sources = ["PaperStream IP fi-8170"];
+
+        var result = await fixture.Probe.ExecuteAsync(new(RicohProbeOperation.ListSources, Verbose: true));
+
+        Assert.Same(environment, result.EnvironmentSources);
+        var source = Assert.Single(result.SdkSources);
+        Assert.True(source.IsSelected);
+        Assert.Equal("TwainDataSource", source.SourceType);
+        Assert.Equal("2.0.0.9", source.DriverAssociation?.DriverVersion);
+        Assert.False(source.SdkErrorCodeAvailable);
+        Assert.Null(source.SdkErrorCode);
+    }
+
+    [Fact]
+    public async Task ListSources_DoesNotCollectEnvironmentWithoutVerbose()
+    {
+        var catalog = new FakeEnvironmentCatalog(RicohSourceEnvironmentSnapshot.Empty);
+        var fixture = Fixture.Create(environmentCatalog: catalog);
+
+        var result = await fixture.Probe.ExecuteAsync(new(RicohProbeOperation.ListSources));
+
+        Assert.Null(result.EnvironmentSources);
+        Assert.Equal(0, catalog.InspectCount);
+    }
+
+    [Fact]
+    public async Task FailedEnumeration_ReturnsStableDiagnosticWithoutInventingSdkError()
+    {
+        var fixture = Fixture.Create();
+        fixture.Session.EnumerationCountResult = -1;
+        fixture.Session.SelectedSourceIndex = -1;
+
+        var result = await fixture.Probe.ExecuteAsync(new(RicohProbeOperation.ListSources));
+
+        Assert.Equal(RicohProbeError.SourceEnumerationFailed, result.DiagnosticCode);
+        Assert.Equal("Failed", result.Status);
+        Assert.False(result.EnumerationErrorCodeAvailable);
+        Assert.Empty(result.SdkSources);
     }
 
     [Theory]
     [InlineData(false, true, true, true, RicohProbeError.NotWindows)]
-    [InlineData(true, false, true, true, RicohProbeError.NotX64)]
+    [InlineData(true, false, true, true, RicohProbeError.UnsupportedArchitecture)]
     [InlineData(true, true, false, true, RicohProbeError.SdkUnavailable)]
     [InlineData(true, true, true, false, RicohProbeError.SdkUnavailable)]
     public async Task PreflightFailure_DoesNotCreateHost(
@@ -64,6 +123,45 @@ public sealed class RicohSerialProbeTests
 
         Assert.Equal(expected, result.DiagnosticCode);
         Assert.Equal(0, fixture.Host.RunCount);
+    }
+
+    [Fact]
+    public async Task X86Availability_IsSupportedAndReportedInOutput()
+    {
+        var fixture = Fixture.Create(new(true, false, true, true, "2.3", IsX86: true));
+
+        var result = await fixture.Probe.ExecuteAsync(new(RicohProbeOperation.Check));
+
+        Assert.Equal("Available", result.Status);
+        Assert.Equal("X86", result.Architecture);
+        Assert.True(result.SdkAvailable);
+        Assert.Equal(0, fixture.Host.RunCount);
+    }
+
+    [Fact]
+    public void ProjectConfiguration_PreservesX64AndAddsExplicitX86SdkBuilds()
+    {
+        var project = ReadRepositoryFile("tools/Atlas.Edge.RicohProbe/Atlas.Edge.RicohProbe.csproj");
+
+        Assert.Contains("<RicohProbeArchitecture Condition=\"'$(EnableRicohSdk)' == 'true' and '$(RicohProbeArchitecture)' == ''\">x64</RicohProbeArchitecture>", project, StringComparison.Ordinal);
+        Assert.Contains("<PlatformTarget Condition=\"'$(EnableRicohSdk)' == 'true'\">$(RicohProbeArchitecture)</PlatformTarget>", project, StringComparison.Ordinal);
+        Assert.Contains("<RuntimeIdentifier Condition=\"'$(EnableRicohSdk)' == 'true'\">win-$(RicohProbeArchitecture)</RuntimeIdentifier>", project, StringComparison.Ordinal);
+        Assert.Contains("<Prefer32Bit Condition=\"'$(EnableRicohSdk)' == 'true'\">false</Prefer32Bit>", project, StringComparison.Ordinal);
+        Assert.Contains("VCS 2017\\x64\\bin\\Release", project, StringComparison.Ordinal);
+        Assert.Contains("VCS 2017\\bin\\Release", project, StringComparison.Ordinal);
+        Assert.Contains("RicohProbeArchitecture must be explicitly set to x64 or x86", project, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ProjectConfiguration_KeepsSdkFreeBuildCrossPlatformAndOutputsRidsSeparately()
+    {
+        var project = ReadRepositoryFile("tools/Atlas.Edge.RicohProbe/Atlas.Edge.RicohProbe.csproj");
+
+        Assert.Contains("<TargetFramework Condition=\"'$(EnableRicohSdk)' != 'true'\">net8.0</TargetFramework>", project, StringComparison.Ordinal);
+        Assert.Contains("<TargetFramework Condition=\"'$(EnableRicohSdk)' == 'true'\">net8.0-windows</TargetFramework>", project, StringComparison.Ordinal);
+        Assert.Contains("win-$(RicohProbeArchitecture)", project, StringComparison.Ordinal);
+        Assert.DoesNotContain("<RuntimeIdentifier>win-x86</RuntimeIdentifier>", project, StringComparison.Ordinal);
+        Assert.DoesNotContain("<RuntimeIdentifier>win-x64</RuntimeIdentifier>", project, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -420,6 +518,15 @@ public sealed class RicohSerialProbeTests
     }
 
     [Fact]
+    public void Arguments_ParseVerboseSourceListing()
+    {
+        var request = RicohProbeArguments.Parse(["--list-sources", "--verbose"]);
+
+        Assert.Equal(RicohProbeOperation.ListSources, request.Operation);
+        Assert.True(request.Verbose);
+    }
+
+    [Fact]
     public void ProbeContract_ExposesNoAcquisitionOrCommandSurface()
     {
         var forbidden = new[]
@@ -438,13 +545,22 @@ public sealed class RicohSerialProbeTests
 
     private static string NewGateName() => $"InterScan.AtlasEdge.RicohSdk.Tests.{Guid.NewGuid():N}";
 
+    private static string ReadRepositoryFile(string relativePath)
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
+        return File.ReadAllText(Path.Combine(root, relativePath));
+    }
+
     private sealed record Fixture(
         RicohSerialProbe Probe,
         FakeHost Host,
         FakeSession Session,
         FakeGate Gate)
     {
-        public static Fixture Create(RicohRuntimeAvailability? availability = null)
+        public static Fixture Create(
+            RicohRuntimeAvailability? availability = null,
+            RicohSourceEnvironmentSnapshot? environment = null,
+            IRicohSourceEnvironmentCatalog? environmentCatalog = null)
         {
             var session = new FakeSession();
             var host = new FakeHost(session);
@@ -454,8 +570,21 @@ public sealed class RicohSerialProbeTests
                 host,
                 gate,
                 new RicohSerialValidator(),
-                TimeProvider.System);
+                TimeProvider.System,
+                environmentCatalog ?? new FakeEnvironmentCatalog(environment ?? RicohSourceEnvironmentSnapshot.Empty));
             return new(probe, host, session, gate);
+        }
+    }
+
+    private sealed class FakeEnvironmentCatalog(RicohSourceEnvironmentSnapshot snapshot)
+        : IRicohSourceEnvironmentCatalog
+    {
+        public int InspectCount { get; private set; }
+
+        public Task<RicohSourceEnvironmentSnapshot> InspectAsync(CancellationToken cancellationToken)
+        {
+            InspectCount++;
+            return Task.FromResult(snapshot);
         }
     }
 
@@ -497,11 +626,14 @@ public sealed class RicohSerialProbeTests
         public int OpenResult { get; set; }
         public int CloseResult { get; set; }
         public int CurrentErrorCode { get; set; }
+        public int EnumerationCountResult { get; set; } = int.MinValue;
+        public int SelectedSourceIndex { get; set; }
         public string? Serial { get; set; } = "R123456789";
         public bool ThrowOnSerialRead { get; set; }
         public int OpenCount { get; private set; }
         public int CloseCount { get; private set; }
         public int SerialReadCount { get; private set; }
+        public int SelectCount { get; private set; }
         public List<string> Actions { get; } = [];
 
         public int WindowHandle => 42;
@@ -528,9 +660,22 @@ public sealed class RicohSerialProbeTests
             return Sources;
         }
 
+        public RicohSdkSourceEnumeration EnumerateSources()
+        {
+            Actions.Add("enumerate");
+            var count = EnumerationCountResult == int.MinValue ? Sources.Count : EnumerationCountResult;
+            return count < 0
+                ? new(count, SelectedSourceIndex, [])
+                : new(
+                    count,
+                    SelectedSourceIndex,
+                    Sources.Select((source, index) => new RicohSdkEnumeratedSource(index, source)).ToArray());
+        }
+
         public int SelectSourceName(string sourceName)
         {
             Actions.Add("select");
+            SelectCount++;
             return 0;
         }
 

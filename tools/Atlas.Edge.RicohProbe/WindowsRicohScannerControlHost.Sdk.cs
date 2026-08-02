@@ -177,6 +177,24 @@ public sealed class WindowsRicohScannerControlHost : IRicohScannerControlHost
             return sources;
         }
 
+        public RicohSdkSourceEnumeration EnumerateSources()
+        {
+            var count = control.GetSourceCount();
+            if (count < 1)
+            {
+                return new RicohSdkSourceEnumeration(count, -1, []);
+            }
+
+            var sources = new List<RicohSdkEnumeratedSource>(Math.Min(count, 64));
+            for (var index = 0; index < count && index < 64; index++)
+            {
+                sources.Add(new RicohSdkEnumeratedSource(index, control.GetSourceName(index)));
+            }
+
+            var selectedIndex = control.GetSourceSelect();
+            return new RicohSdkSourceEnumeration(count, selectedIndex, sources);
+        }
+
         public int SelectSourceName(string sourceName) => control.SelectSourceName(sourceName);
 
         public int OpenScanner(int containingWindowHandle) => control.OpenScanner(containingWindowHandle);

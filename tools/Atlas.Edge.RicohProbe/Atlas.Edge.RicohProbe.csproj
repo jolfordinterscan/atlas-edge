@@ -6,17 +6,30 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <EnableRicohSdk Condition="'$(EnableRicohSdk)' == ''">false</EnableRicohSdk>
+    <RicohProbeArchitecture Condition="'$(EnableRicohSdk)' == 'true' and '$(RicohProbeArchitecture)' == ''">x64</RicohProbeArchitecture>
     <DefineConstants Condition="'$(EnableRicohSdk)' == 'true'">$(DefineConstants);RICOH_SDK</DefineConstants>
     <UseWindowsForms Condition="'$(EnableRicohSdk)' == 'true'">true</UseWindowsForms>
     <EnableWindowsTargeting Condition="'$(EnableRicohSdk)' == 'true'">true</EnableWindowsTargeting>
-    <PlatformTarget Condition="'$(EnableRicohSdk)' == 'true'">x64</PlatformTarget>
-    <RuntimeIdentifier Condition="'$(EnableRicohSdk)' == 'true'">win-x64</RuntimeIdentifier>
+    <PlatformTarget Condition="'$(EnableRicohSdk)' == 'true'">$(RicohProbeArchitecture)</PlatformTarget>
+    <RuntimeIdentifier Condition="'$(EnableRicohSdk)' == 'true'">win-$(RicohProbeArchitecture)</RuntimeIdentifier>
+    <Prefer32Bit Condition="'$(EnableRicohSdk)' == 'true'">false</Prefer32Bit>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(EnableRicohSdk)' == 'true'">
-    <RicohAxInteropPath>$(RicohSdkRoot)\Sample\ScanTest\VCS 2017\x64\bin\Release\AxInterop.FiScnLib.dll</RicohAxInteropPath>
-    <RicohInteropPath>$(RicohSdkRoot)\Sample\ScanTest\VCS 2017\x64\bin\Release\Interop.FiScnLib.dll</RicohInteropPath>
     <RicohSampleStatePath>$(RicohSdkRoot)\Sample\ScanTest\VCS 2017\FormScan.resx</RicohSampleStatePath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(EnableRicohSdk)' == 'true' and '$(RicohProbeArchitecture)' == 'x64'">
+    <RicohSdkInteropDirectory>$(RicohSdkRoot)\Sample\ScanTest\VCS 2017\x64\bin\Release</RicohSdkInteropDirectory>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(EnableRicohSdk)' == 'true' and '$(RicohProbeArchitecture)' == 'x86'">
+    <RicohSdkInteropDirectory>$(RicohSdkRoot)\Sample\ScanTest\VCS 2017\bin\Release</RicohSdkInteropDirectory>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(EnableRicohSdk)' == 'true'">
+    <RicohAxInteropPath>$(RicohSdkInteropDirectory)\AxInterop.FiScnLib.dll</RicohAxInteropPath>
+    <RicohInteropPath>$(RicohSdkInteropDirectory)\Interop.FiScnLib.dll</RicohInteropPath>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(EnableRicohSdk)' == 'true'">
@@ -38,10 +51,15 @@
     <Compile Remove="WindowsRicohScannerControlHost.Sdk.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Atlas.Edge.ScannerDiscovery\Atlas.Edge.ScannerDiscovery.csproj" />
+  </ItemGroup>
+
   <Target Name="ValidateRicohSdkReferences" BeforeTargets="ResolveReferences" Condition="'$(EnableRicohSdk)' == 'true'">
     <Error Condition="'$(RicohSdkRoot)' == ''" Text="RicohSdkRoot is required when EnableRicohSdk=true." />
-    <Error Condition="!Exists('$(RicohAxInteropPath)')" Text="The x64 AxInterop.FiScnLib.dll reference was not found beneath RicohSdkRoot." />
-    <Error Condition="!Exists('$(RicohInteropPath)')" Text="The x64 Interop.FiScnLib.dll reference was not found beneath RicohSdkRoot." />
+    <Error Condition="'$(RicohProbeArchitecture)' != 'x64' and '$(RicohProbeArchitecture)' != 'x86'" Text="RicohProbeArchitecture must be explicitly set to x64 or x86." />
+    <Error Condition="!Exists('$(RicohAxInteropPath)')" Text="The $(RicohProbeArchitecture) AxInterop.FiScnLib.dll reference was not found beneath RicohSdkRoot at '$(RicohAxInteropPath)'." />
+    <Error Condition="!Exists('$(RicohInteropPath)')" Text="The $(RicohProbeArchitecture) Interop.FiScnLib.dll reference was not found beneath RicohSdkRoot at '$(RicohInteropPath)'." />
     <Error Condition="!Exists('$(RicohSampleStatePath)')" Text="The official FormScan.resx ActiveX state was not found beneath RicohSdkRoot." />
   </Target>
 </Project>

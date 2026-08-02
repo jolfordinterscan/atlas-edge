@@ -9,10 +9,11 @@ internal static class Program
     public static async Task<int> Main(string[] args)
     {
         var request = RicohProbeArguments.Parse(args);
-        if (request.Operation == RicohProbeOperation.ReadSerial &&
+        if ((request.Operation == RicohProbeOperation.ReadSerial ||
+             request.Operation == RicohProbeOperation.ListSources) &&
             !args.Contains("--internal-worker", StringComparer.Ordinal))
         {
-            return await RunSupervisedWorkerAsync(args).ConfigureAwait(false);
+            return await RunSupervisedWorkerAsync(args, request.Operation).ConfigureAwait(false);
         }
 
         var availability = new WindowsRicohRuntimeAvailability(
@@ -35,7 +36,8 @@ internal static class Program
             host,
             new MachineWideRicohSessionGate(),
             new RicohSerialValidator(),
-            TimeProvider.System);
+            TimeProvider.System,
+            new WindowsRicohSourceEnvironmentCatalog());
 
         using var timeout = new CancellationTokenSource(WorkerTimeout);
         var result = await probe.ExecuteAsync(request, timeout.Token).ConfigureAwait(false);
@@ -43,7 +45,7 @@ internal static class Program
         return result.Status is "Success" or "Available" ? 0 : 2;
     }
 
-    private static async Task<int> RunSupervisedWorkerAsync(string[] args)
+    private static async Task<int> RunSupervisedWorkerAsync(string[] args, RicohProbeOperation operation)
     {
         var startInfo = CreateWorkerStartInfo(args);
         using var process = new Process { StartInfo = startInfo };
@@ -58,7 +60,7 @@ internal static class Program
             _ = await errorTask.ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(output))
             {
-                return WriteSupervisorFailure(RicohProbeError.UnhandledFailure);
+                return WriteSupervisorFailure(RicohProbeError.UnhandledFailure, operation);
             }
 
             Console.Write(output);
@@ -71,11 +73,11 @@ internal static class Program
                 process.Kill(entireProcessTree: true);
             }
 
-            return WriteSupervisorFailure(RicohProbeError.Timeout);
+            return WriteSupervisorFailure(RicohProbeError.Timeout, operation);
         }
         catch
         {
-            return WriteSupervisorFailure(RicohProbeError.UnhandledFailure);
+            return WriteSupervisorFailure(RicohProbeError.UnhandledFailure, operation);
         }
     }
 
@@ -104,11 +106,11 @@ internal static class Program
         return startInfo;
     }
 
-    private static int WriteSupervisorFailure(string diagnosticCode)
+    private static int WriteSupervisorFailure(string diagnosticCode, RicohProbeOperation operation)
     {
         Console.WriteLine(RicohProbeJson.Serialize(new RicohSerialProbeResult
         {
-            Operation = RicohProbeOperation.ReadSerial.ToString(),
+            Operation = operation.ToString(),
             DiagnosticCode = diagnosticCode
         }));
         return 2;
@@ -133,7 +135,8 @@ public static class RicohProbeArguments
             Value(args, "--manufacturer"),
             Value(args, "--model"),
             Value(args, "--usb-vid"),
-            Value(args, "--usb-pid"));
+            Value(args, "--usb-pid"),
+            args.Contains("--verbose", StringComparer.OrdinalIgnoreCase));
     }
 
     private static string? Value(IReadOnlyList<string> args, string name)

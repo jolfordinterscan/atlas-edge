@@ -13,6 +13,8 @@ public interface IRicohScannerControlSession
 
     IReadOnlyList<string> GetSources();
 
+    RicohSdkSourceEnumeration EnumerateSources();
+
     int SelectSourceName(string sourceName);
 
     int OpenScanner(int windowHandle);
@@ -32,6 +34,17 @@ public interface IRicohScannerControlHost
 public interface IRicohSessionGate
 {
     IDisposable? TryAcquire();
+}
+
+public interface IRicohSourceEnvironmentCatalog
+{
+    Task<RicohSourceEnvironmentSnapshot> InspectAsync(CancellationToken cancellationToken);
+}
+
+public sealed class NoOpRicohSourceEnvironmentCatalog : IRicohSourceEnvironmentCatalog
+{
+    public Task<RicohSourceEnvironmentSnapshot> InspectAsync(CancellationToken cancellationToken) =>
+        Task.FromResult(RicohSourceEnvironmentSnapshot.Empty);
 }
 
 public interface IRicohSerialValidator

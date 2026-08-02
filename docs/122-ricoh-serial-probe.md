@@ -9,9 +9,10 @@ The probe is not part of Atlas Edge Runtime. It does not change WIA discovery, d
 The probe supports:
 
 - `--check`: passive OS, architecture, x64 COM registration, and SDK-enabled-build inspection. It does not instantiate the ActiveX control.
+- `--list-sources`: creates the ActiveX host and calls only the documented source-enumeration methods. Adding `--verbose` also compares the SDK list with read-only WIA, PnP, and installed TWAIN catalogs.
 - `--read-serial`: the only public mode that starts the supervised ActiveX worker and opens the scanner.
 
-No argument performs no scanner operation and returns `ricoh_probe_explicit_mode_required`. An independent `--list-sources` operation is deliberately unavailable because the SDK source methods require creating the ActiveX host; source enumeration occurs only inside an explicit `--read-serial` session.
+No argument performs no scanner operation and returns `ricoh_probe_explicit_mode_required`. Source listing never calls source-selection, open, serial, close, acquisition, or command methods. See [123-ricoh-source-enumeration.md](123-ricoh-source-enumeration.md).
 
 ## Why OpenScanner is used
 
@@ -32,9 +33,12 @@ The probe also exposes no image, acquisition, scan, reset, firmware, EEPROM, cou
 The project uses conditional local references (Strategy A):
 
 - Normal builds target `net8.0`, compile only SDK-free orchestration and the no-op host, and require no Windows desktop or proprietary SDK.
-- SDK-enabled builds target `net8.0-windows`, `win-x64`, set `PlatformTarget=x64`, enable WinForms, and compile `WindowsRicohScannerControlHost.Sdk.cs`.
-- `EnableRicohSdk=true` and `RicohSdkRoot` are mandatory for an SDK-enabled build.
-- The build validates the x64 `AxInterop.FiScnLib.dll`, `Interop.FiScnLib.dll`, and official sample `FormScan.resx` paths beneath `RicohSdkRoot`.
+- SDK-enabled builds target `net8.0-windows`, enable WinForms, and compile `WindowsRicohScannerControlHost.Sdk.cs`.
+- `RicohProbeArchitecture` explicitly selects `x64`/`win-x64` or `x86`/`win-x86`; `Prefer32Bit` is false for both. The SDK-enabled default remains x64 for compatibility, but validation commands should state the architecture.
+- `EnableRicohSdk=true` and `RicohSdkRoot` are mandatory for an SDK-enabled build. Architecture values other than `x64` and `x86` are rejected.
+- x64 builds reference `Sample\ScanTest\VCS 2017\x64\bin\Release\AxInterop.FiScnLib.dll` and `Interop.FiScnLib.dll`.
+- x86 builds reference `Sample\ScanTest\VCS 2017\bin\Release\AxInterop.FiScnLib.dll` and `Interop.FiScnLib.dll`.
+- Both use the official shared `Sample\ScanTest\VCS 2017\FormScan.resx` ActiveX state.
 - The ignored local interop assemblies may be copied by MSBuild only into ignored local `bin/obj` output for this proof of concept. Those outputs must not be packaged, published as CI artifacts, staged, committed, or redistributed.
 - The sample ActiveX state is read from the ignored official `FormScan.resx` at runtime. Its proprietary serialized value is not copied into Atlas source or embedded as a new repository resource.
 - Before the trusted local resource reader deserializes ActiveX state, the complete V2.3L70 sample resource must match SHA-256 `2e1f69bd52dc91d3e79692eef83782643821d57ae9690ac4d3c04fcac46f750c`. A modified or different resource is rejected as `ricoh_activex_creation_failed`.
@@ -42,6 +46,14 @@ The project uses conditional local references (Strategy A):
 No absolute development-machine SDK path is stored in source. `RicohSdkRoot` is recorded only in the locally built probe assembly so it can locate the official sample state during that local run.
 
 This approach is for controlled development validation only. It is not a production packaging decision or a redistribution approval.
+
+## Why this workstation requires the x86 helper
+
+Windows validation established that the SDK-enabled x64 probe initializes correctly and its TWAIN DSM calls return `TWRC_SUCCESS` / `TWCC_SUCCESS`, but its complete SDK list contains only `InoTec Scamax USB3`. `C:\Windows\twain_64` contains no Fujitsu/PaperStream source. The installed PaperStream stack, including multiple `Fjic*.ds` files, is under `C:\Windows\twain_32\Fjicube`.
+
+A 64-bit process cannot load the installed 32-bit PaperStream TWAIN data source. The x86 probe is therefore a separate vendor helper process; Atlas Edge Runtime remains x64. Both helper architectures retain the same JSON contract, supervised process boundary, STA ActiveX host, session semaphore, target eligibility, source selection, serial validation, and timeout behavior.
+
+The x86 path requires the x86 .NET 8 Windows Desktop Runtime plus the official 32-bit RICOH Scanner Control Runtime and ActiveX registration in the 32-bit COM registry view. Atlas does not install, register, copy, or redistribute those components.
 
 ## ActiveX host
 
@@ -115,7 +127,7 @@ Exit worker
 
 ## Session gate
 
-The worker attempts to acquire this named machine-wide mutex without waiting:
+The worker attempts to acquire this named machine-wide semaphore without waiting:
 
 ```text
 Global\InterScan.AtlasEdge.RicohSdk
@@ -193,10 +205,21 @@ $RicohSdkRoot = "C:\LocalSdk\FiScnSDK23"
 dotnet build -c Release `
   .\tools\Atlas.Edge.RicohProbe\Atlas.Edge.RicohProbe.csproj `
   -p:EnableRicohSdk=true `
+  -p:RicohProbeArchitecture=x64 `
   -p:RicohSdkRoot="$RicohSdkRoot"
 ```
 
-The root must contain the official `Sample\ScanTest\VCS 2017\x64\bin\Release` interop assemblies and `Sample\ScanTest\VCS 2017\FormScan.resx`. Do not point the command at a copied or repackaged SDK directory.
+SDK-enabled local Windows x86 build:
+
+```powershell
+dotnet build -c Release `
+  .\tools\Atlas.Edge.RicohProbe\Atlas.Edge.RicohProbe.csproj `
+  -p:EnableRicohSdk=true `
+  -p:RicohProbeArchitecture=x86 `
+  -p:RicohSdkRoot="$RicohSdkRoot"
+```
+
+The x64 output is beneath `bin\Release\net8.0-windows\win-x64`; the x86 output is beneath `bin\Release\net8.0-windows\win-x86`. The root must contain the matching official interop directory and shared `FormScan.resx`. Do not point the command at a copied or repackaged SDK directory.
 
 ## Windows validation commands
 
@@ -205,6 +228,7 @@ Set the local SDK root once:
 ```powershell
 $Project = ".\tools\Atlas.Edge.RicohProbe\Atlas.Edge.RicohProbe.csproj"
 $RicohSdkRoot = "C:\LocalSdk\FiScnSDK23"
+$X86Probe = ".\tools\Atlas.Edge.RicohProbe\bin\Release\net8.0-windows\win-x86\Atlas.Edge.RicohProbe.exe"
 ```
 
 Passive check—the control is not instantiated:
@@ -212,17 +236,35 @@ Passive check—the control is not instantiated:
 ```powershell
 dotnet run -c Release --project $Project `
   -p:EnableRicohSdk=true `
+  -p:RicohProbeArchitecture=x64 `
   -p:RicohSdkRoot="$RicohSdkRoot" `
   -- --check
 ```
 
-Independent source listing is intentionally unavailable. This command verifies that it fails without creating the ActiveX host:
+x86 passive check—the control is not instantiated and the scanner is not opened:
+
+```powershell
+& $X86Probe --check
+```
+
+Source listing creates the ActiveX host but does not open or select a scanner:
 
 ```powershell
 dotnet run -c Release --project $Project `
   -p:EnableRicohSdk=true `
+  -p:RicohProbeArchitecture=x64 `
   -p:RicohSdkRoot="$RicohSdkRoot" `
   -- --list-sources
+```
+
+Verbose source comparison adds sanitized WIA, Windows PnP, and installed TWAIN data-source metadata:
+
+```powershell
+dotnet run -c Release --project $Project `
+  -p:EnableRicohSdk=true `
+  -p:RicohProbeArchitecture=x64 `
+  -p:RicohSdkRoot="$RicohSdkRoot" `
+  -- --list-sources --verbose
 ```
 
 Serial read with automatic unique fi-8170 source selection:
@@ -230,6 +272,7 @@ Serial read with automatic unique fi-8170 source selection:
 ```powershell
 dotnet run -c Release --project $Project `
   -p:EnableRicohSdk=true `
+  -p:RicohProbeArchitecture=x64 `
   -p:RicohSdkRoot="$RicohSdkRoot" `
   -- --read-serial `
   --manufacturer "FUJITSU" `
@@ -238,11 +281,32 @@ dotnet run -c Release --project $Project `
   --usb-pid "15FF"
 ```
 
+x86 source diagnostics—the ActiveX control is hosted, but no source is selected or opened:
+
+```powershell
+& $X86Probe --list-sources --verbose
+```
+
+x86 serial read with the same bounded fi-8170 eligibility rules:
+
+```powershell
+& $X86Probe `
+  --read-serial `
+  --manufacturer "FUJITSU" `
+  --model "fi-8170" `
+  --usb-vid "04C5" `
+  --usb-pid "15FF" `
+  --internal-worker
+```
+
+`--internal-worker` intentionally bypasses the parent watchdog for direct Windows diagnostics. Prefer the normal command without it for routine validation so the 15-second parent watchdog remains active.
+
 If multiple fi-8170 SDK sources are returned, rerun only after identifying the exact intended SDK source through an approved local process:
 
 ```powershell
 dotnet run -c Release --project $Project `
   -p:EnableRicohSdk=true `
+  -p:RicohProbeArchitecture=x64 `
   -p:RicohSdkRoot="$RicohSdkRoot" `
   -- --read-serial `
   --source-name "<exact SDK source name>" `
@@ -254,16 +318,18 @@ dotnet run -c Release --project $Project `
 
 ## Windows validation plan
 
-1. Confirm PaperStream IP and the official x64 RICOH Scanner Control Runtime were installed through approved installers.
+1. Confirm PaperStream IP and the official 32-bit RICOH Scanner Control Runtime were installed through approved installers.
 2. Close PaperStream Capture for the first run.
-3. Run `--check` and confirm x64 runtime registration without scanner activity.
-4. Run one `--read-serial` session and record only its JSON result and timing.
-5. Compare the serial to an authoritative hardware label or approved RICOH/PFU utility.
-6. Confirm `scannerClosed=true` and immediately scan through the normal application.
-7. Test disconnected, busy, no-source, ambiguous-source, and exact-source cases.
-8. Test while PaperStream Capture is idle and actively scanning. Atlas must fail without interrupting the job.
-9. Force a watchdog timeout in a controlled test, then verify driver and scanner recovery.
-10. Do not enable runtime polling or inventory integration based solely on one successful read.
+3. Build x86 explicitly and confirm its output is isolated beneath `win-x86` while x64 remains beneath `win-x64`.
+4. Run x86 `--check` and confirm `architecture` is `X86` without scanner activity.
+5. Run x86 `--list-sources --verbose`; confirm a unique fi-8170/PaperStream source appears before attempting a serial read.
+6. Run one x86 `--read-serial` session and record only its JSON result and timing.
+7. Compare the serial to an authoritative hardware label or approved RICOH/PFU utility.
+8. Confirm `scannerClosed=true` and immediately scan through the normal application.
+9. Test disconnected, busy, no-source, ambiguous-source, and exact-source cases.
+10. Test while PaperStream Capture is idle and actively scanning. Atlas must fail without interrupting the job.
+11. Force a watchdog timeout in a controlled test, then verify driver and scanner recovery.
+12. Do not enable runtime polling or inventory integration based solely on one successful read.
 
 ## Redistribution limitation
 
@@ -271,8 +337,8 @@ The SDK, runtime, OCX, license, manuals, samples, interop assemblies, and Active
 
 ## Known limitations
 
-- The SDK-enabled project and real fi-8170 path are unverified on Windows.
-- Hidden ActiveX hosting and .NET 8 compatibility with the supplied interop assemblies remain unverified.
+- The SDK-enabled x64 host is verified on Windows, but it cannot see the workstation's 32-bit PaperStream TWAIN source.
+- The x86 build, 32-bit ActiveX registration, source enumeration, and real fi-8170 serial path still require Windows execution.
 - SDK source names may not uniquely distinguish identical scanners.
 - `OpenScanner` interference and lock duration remain unknown.
 - Process termination after timeout may leave vendor driver state requiring recovery.
