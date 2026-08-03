@@ -1,3 +1,6 @@
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Atlas.Edge.Configuration;
 using Atlas.Edge.Core;
 using Atlas.Edge.Enrollment;
@@ -286,6 +289,7 @@ public sealed class Worker : BackgroundService
         await _credentialStore.SaveAsync(credentials, cancellationToken);
 
         _transportCredentialProvider.Initialize(credentials);
+        await ClearEnrollmentCodeAsync(cancellationToken);
 
         _logger.LogInformation(
             "Enrollment succeeded for agent {AgentId}; site timezone {SiteTimezone}; token fingerprint {TokenFingerprint}.",
@@ -294,5 +298,85 @@ public sealed class Worker : BackgroundService
             SecretRedactor.Redact(response.AccessToken));
 
         return _identity;
+    }
+
+    private async Task ClearEnrollmentCodeAsync(CancellationToken cancellationToken)
+    {
+        var configurationPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            "InterScan",
+            "Atlas Edge",
+            "configuration",
+            "appsettings.json");
+
+        if (!File.Exists(configurationPath))
+        {
+            return;
+        }
+
+        string? temporaryPath = null;
+
+        try
+        {
+            var json = await File.ReadAllTextAsync(
+                configurationPath,
+                cancellationToken);
+
+            var root = JsonNode.Parse(json) as JsonObject;
+            if (root?["AtlasEdge"] is not JsonObject atlasEdge)
+            {
+                _logger.LogWarning(
+                    "Machine configuration has no AtlasEdge section; enrollment code cleanup was skipped.");
+                return;
+            }
+
+            atlasEdge["EnrollmentCode"] = string.Empty;
+
+            temporaryPath = Path.Combine(
+                Path.GetDirectoryName(configurationPath)!,
+                $"appsettings.{Guid.NewGuid():N}.tmp");
+
+            var updatedJson = root.ToJsonString(
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true
+                });
+
+            await File.WriteAllTextAsync(
+                temporaryPath,
+                updatedJson,
+                new UTF8Encoding(false),
+                cancellationToken);
+
+            File.Move(
+                temporaryPath,
+                configurationPath,
+                overwrite: true);
+
+            temporaryPath = null;
+
+            _logger.LogInformation(
+                "Cleared the one-time enrollment code from machine configuration.");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception) when (
+            exception is IOException or
+            UnauthorizedAccessException or
+            JsonException)
+        {
+            _logger.LogWarning(
+                exception,
+                "Enrollment succeeded, but the one-time enrollment code could not be cleared.");
+        }
+        finally
+        {
+            if (temporaryPath is not null && File.Exists(temporaryPath))
+            {
+                File.Delete(temporaryPath);
+            }
+        }
     }
 }
