@@ -9,6 +9,7 @@
     <RuntimePublishDir Condition="'$(RuntimePublishDir)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\installer\staging\runtime</RuntimePublishDir>
     <InstallerRoot Condition="'$(InstallerRoot)' == ''">$(MSBuildThisFileDirectory)..</InstallerRoot>
     <DefineConstants>ProductVersion=$(ProductVersion);BrandAssetsDir=$(BrandAssetsDir);RuntimePublishDir=$(RuntimePublishDir);InstallerRoot=$(InstallerRoot)</DefineConstants>
+    <SuppressValidation>true</SuppressValidation>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="WixToolset.UI.wixext" Version="4.0.5" />

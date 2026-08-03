@@ -1,4 +1,4 @@
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+﻿<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <Package Name="Atlas Edge"
@@ -98,7 +98,7 @@
       </Component>
       <Component Id="AtlasEdgeConfigurationData" Directory="CONFIGURATIONDATA" Guid="7B9261B1-2769-40A6-B7E4-4A47072674D0" Permanent="yes" NeverOverwrite="yes">
         <CreateFolder />
-        <File Id="ProductionConfiguration" Source="$(var.InstallerRoot)\config\appsettings.json" Name="appsettings.json" KeyPath="yes" NeverOverwrite="yes" />
+        <File Id="ProductionConfiguration" Source="$(var.InstallerRoot)\config\appsettings.json" Name="appsettings.json" KeyPath="yes" />
       </Component>
       <Component Id="AtlasEdgeIdentityData" Directory="IDENTITYDATA" Guid="1CC31264-E54C-454F-ABBD-24892071611D" Permanent="yes" NeverOverwrite="yes">
         <CreateFolder />
@@ -124,10 +124,14 @@
     <WixVariable Id="WixUILicenseRtf" Value="$(var.InstallerRoot)\legal\ATLAS-EDGE-EULA-DRAFT.rtf" />
     <ui:WixUI Id="AtlasEdgeInstallDir" InstallDirectory="INSTALLFOLDER" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="Atlas Edge has been successfully installed. Atlas Edge Runtime service installed. Automatic service startup configured. Local scanner monitoring foundation ready. Atlas enrollment and cloud connectivity are not configured by this installer checkpoint." />
-
-    <ProgressText Action="InstallFiles">Installing Atlas Edge Runtime</ProgressText>
-    <ProgressText Action="WriteRegistryValues">Registering Windows Event Log source and local data directories</ProgressText>
-    <ProgressText Action="InstallServices">Registering Windows Service and configuring automatic startup</ProgressText>
-    <ProgressText Action="StartServices">Starting Atlas Edge Runtime</ProgressText>
+    <UI>
+      <ProgressText Action="InstallFiles" Message="Installing Atlas Edge Runtime" />
+      <ProgressText Action="WriteRegistryValues" Message="Registering Windows Event Log source and local data directories" />
+      <ProgressText Action="InstallServices" Message="Registering Windows Service and configuring automatic startup" />
+      <ProgressText Action="StartServices" Message="Starting Atlas Edge Runtime" />
+    </UI>
   </Package>
 </Wix>
+
+
+
