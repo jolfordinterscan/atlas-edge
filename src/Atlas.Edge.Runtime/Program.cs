@@ -21,7 +21,7 @@ var optionsSectionPath = AtlasEdgeOptions.SectionName;
 var enrollmentUrlValue = builder.Configuration[$"{optionsSectionPath}:EnrollmentUrl"];
 if (!Uri.TryCreate(enrollmentUrlValue, UriKind.Absolute, out var enrollmentUrl))
 {
-    enrollmentUrl = new Uri("https://localhost:7143/");
+    enrollmentUrl = new Uri("https://staging.atlas.interscan.com/");
 }
 
 var httpTimeoutSecondsValue = builder.Configuration[$"{optionsSectionPath}:HttpTimeoutSeconds"];

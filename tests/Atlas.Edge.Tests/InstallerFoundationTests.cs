@@ -128,7 +128,7 @@ public sealed class InstallerFoundationTests
         Assert.False(options.GetProperty("ScannerEvidenceEnabled").GetBoolean());
         Assert.All(
             new[] { options.GetProperty("IngestionUrl").GetString(), options.GetProperty("EnrollmentUrl").GetString() },
-            value => Assert.Contains("example.invalid", value, StringComparison.Ordinal));
+            value => Assert.Contains("staging.atlas.interscan.com", value, StringComparison.Ordinal));
 
         var installerSources = ReadInstallerText();
         Assert.DoesNotContain("Authorization: Bearer ", installerSources, StringComparison.OrdinalIgnoreCase);

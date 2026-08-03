@@ -25,10 +25,10 @@ public sealed class AtlasEdgeOptions
 
     public string TenantBinding { get; set; } = "tenant-placeholder";
 
-    public string IngestionUrl { get; set; } = "https://example.invalid/atlas-ingestion-placeholder";
+    public string IngestionUrl { get; set; } = "https://staging.atlas.interscan.com/";
 
     [Required]
-    public string EnrollmentUrl { get; set; } = "https://localhost:7143/";
+    public string EnrollmentUrl { get; set; } = "https://staging.atlas.interscan.com/";
 
     public string EnrollmentCode { get; set; } = string.Empty;
 
@@ -94,7 +94,7 @@ public sealed class AtlasEdgeOptions
     public string[] ScannerDiscoveryProviders { get; set; } = ["Wia"];
 
     [Required]
-    public string ScannerInventoryPublishMode { get; set; } = ScannerInventoryPublishModeQueueOnly;
+    public string ScannerInventoryPublishMode { get; set; } = ScannerInventoryPublishModeTransport;
 
     [Range(3600, 604800)]
     public int ScannerInventoryReconciliationIntervalSeconds { get; set; } = 86400;
