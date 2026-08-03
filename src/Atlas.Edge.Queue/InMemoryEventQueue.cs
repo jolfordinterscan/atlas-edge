@@ -7,6 +7,7 @@ public sealed class InMemoryEventQueue : IEventQueue
 {
     private readonly ConcurrentDictionary<string, QueueEntry> _entries = new();
     private readonly object _inventorySync = new();
+    private string? _lastAcknowledgedInventoryVersion;
     private ScannerInventoryQueueEntry? _latestInventory;
 
     public Task<string> EnqueueAsync(AgentHeartbeatEvent heartbeatEvent, CancellationToken cancellationToken)
@@ -30,6 +31,12 @@ public sealed class InMemoryEventQueue : IEventQueue
 
     public Task<ScannerInventoryEnqueueResult> EnqueueInventoryAsync(
         ScannerInventoryEvent inventoryEvent,
+        CancellationToken cancellationToken) =>
+        EnqueueInventoryAsync(inventoryEvent, false, cancellationToken);
+
+    public Task<ScannerInventoryEnqueueResult> EnqueueInventoryAsync(
+        ScannerInventoryEvent inventoryEvent,
+        bool forceReconciliation,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -37,14 +44,19 @@ public sealed class InMemoryEventQueue : IEventQueue
 
         lock (_inventorySync)
         {
-            if (_latestInventory is not null &&
-                string.Equals(
-                    _latestInventory.Event.InventoryVersion,
-                    inventoryEvent.InventoryVersion,
-                    StringComparison.Ordinal))
+            if ((_latestInventory is not null &&
+                 string.Equals(
+                     _latestInventory.Event.InventoryVersion,
+                     inventoryEvent.InventoryVersion,
+                     StringComparison.Ordinal)) ||
+                (!forceReconciliation &&
+                 string.Equals(
+                     _lastAcknowledgedInventoryVersion,
+                     inventoryEvent.InventoryVersion,
+                     StringComparison.Ordinal)))
             {
                 return Task.FromResult(new ScannerInventoryEnqueueResult(
-                    _latestInventory.ReceiptId,
+                    _latestInventory?.ReceiptId ?? string.Empty,
                     false));
             }
 
@@ -69,8 +81,10 @@ public sealed class InMemoryEventQueue : IEventQueue
         cancellationToken.ThrowIfCancellationRequested();
         lock (_inventorySync)
         {
-            if (string.Equals(_latestInventory?.Event.EventId, eventId, StringComparison.Ordinal))
+            var pending = _latestInventory;
+            if (string.Equals(pending?.Event.EventId, eventId, StringComparison.Ordinal))
             {
+                _lastAcknowledgedInventoryVersion = pending!.Event.InventoryVersion;
                 _latestInventory = null;
             }
         }

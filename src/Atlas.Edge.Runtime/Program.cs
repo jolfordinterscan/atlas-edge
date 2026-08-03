@@ -48,7 +48,29 @@ builder.Services.AddSingleton<DevelopmentIdentityProvider>();
 builder.Services.AddSingleton<RuntimeTransportCredentialProvider>();
 builder.Services.AddSingleton<ITransportCredentialProvider>(sp => sp.GetRequiredService<RuntimeTransportCredentialProvider>());
 builder.Services.AddSingleton<HeartbeatEventBuilder>();
-builder.Services.AddSingleton<IEventQueue, InMemoryEventQueue>();
+builder.Services.AddSingleton<IEventQueue>(sp =>
+{
+    var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<AtlasEdgeOptions>>().Value;
+    if (string.Equals(options.TransportMode, AtlasEdgeOptions.TransportModeNull, StringComparison.OrdinalIgnoreCase))
+    {
+        return new InMemoryEventQueue();
+    }
+
+    var configuredPath = options.EventQueueStorePath;
+    var path = string.IsNullOrWhiteSpace(configuredPath)
+        ? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            "InterScan",
+            "Atlas Edge",
+            "queue",
+            "outbound-events.json")
+        : configuredPath;
+    return new JsonFileEventQueue(
+        path,
+        options.QueueMaximumPendingEvents,
+        TimeSpan.FromHours(options.QueueRetentionHours),
+        sp.GetRequiredService<TimeProvider>());
+});
 builder.Services.AddSingleton<ScannerInventoryState>();
 builder.Services.AddSingleton<ScannerHealthState>();
 builder.Services.AddSingleton<ScannerConnectorState>();

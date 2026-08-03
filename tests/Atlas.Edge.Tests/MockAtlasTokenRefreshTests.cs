@@ -91,6 +91,46 @@ public sealed class MockAtlasTokenRefreshTests
         Assert.Contains("access_token_expired", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Events_AcceptScannerInventoryThroughTheAuthenticatedBatchContract()
+    {
+        await using var factory = CreateFactory();
+        var client = factory.CreateClient();
+        var enrollment = await EnrollAsync(client);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            enrollment.AccessToken);
+
+        var response = await client.PostAsJsonAsync("/api/edge/v1/events/batch", new
+        {
+            agentId = enrollment.AgentId,
+            tenantBinding = enrollment.TenantBinding,
+            events = new[]
+            {
+                new
+                {
+                    eventId = "inventory-1",
+                    eventType = "scanner.inventory",
+                    schemaVersion = "1.0",
+                    eventTimestampUtc = DateTimeOffset.UtcNow,
+                    observedTimestampUtc = DateTimeOffset.UtcNow,
+                    agentId = enrollment.AgentId,
+                    workstationId = enrollment.DeviceId,
+                    tenantBinding = enrollment.TenantBinding,
+                    sourceAdapter = "scanner.discovery",
+                    correlationId = (string?)null,
+                    environmentName = "Test",
+                    inventoryVersion = new string('a', 64),
+                    scannerCount = 0,
+                    scanners = Array.Empty<object>()
+                }
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("inventory-1", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
     private static WebApplicationFactory<MockAtlasApiMarker> CreateFactory(
         params (string Key, string Value)[] overrides) =>
         new WebApplicationFactory<MockAtlasApiMarker>().WithWebHostBuilder(builder =>

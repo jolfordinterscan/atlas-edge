@@ -220,10 +220,11 @@ app.MapPost("/api/edge/v1/events/batch", (BatchRequest request, HttpContext http
 
     foreach (var evt in request.events)
     {
-        if (!string.Equals(evt.eventType, "agent.heartbeat", StringComparison.Ordinal))
+        if (!string.Equals(evt.eventType, "agent.heartbeat", StringComparison.Ordinal) &&
+            !string.Equals(evt.eventType, "scanner.inventory", StringComparison.Ordinal))
         {
             return Results.Json(
-                new ErrorResponse("unsupported_event_type", "Only agent.heartbeat is currently supported.", retryable: false),
+                new ErrorResponse("unsupported_event_type", "Only agent.heartbeat and scanner.inventory are supported.", retryable: false),
                 statusCode: StatusCodes.Status400BadRequest);
         }
 

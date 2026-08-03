@@ -164,6 +164,23 @@ public sealed class ConfigurationValidationTests
     }
 
     [Fact]
+    public void Validate_RejectsRelativeQueuePathAndInvertedRetryBounds()
+    {
+        var options = new AtlasEdgeOptions
+        {
+            EventQueueStorePath = "relative/queue.json",
+            QueueRetryBaseSeconds = 30,
+            QueueRetryMaximumSeconds = 10
+        };
+
+        var result = new AtlasEdgeOptionsValidator().Validate(Options.DefaultName, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, value => value.Contains("EventQueueStorePath", StringComparison.Ordinal));
+        Assert.Contains(result.Failures!, value => value.Contains("QueueRetryMaximumSeconds", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Validate_RejectsUnknownScannerHealthProvider()
     {
         var options = new AtlasEdgeOptions

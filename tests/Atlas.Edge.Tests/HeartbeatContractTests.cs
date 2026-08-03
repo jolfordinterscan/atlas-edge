@@ -14,7 +14,7 @@ public sealed class HeartbeatContractTests
         var identity = new AgentIdentity("agent-1", "workstation-1", "tenant-a", "Development", true, now);
         var options = new AtlasEdgeOptions();
 
-        var heartbeat = builder.Build(identity, options, now);
+        var heartbeat = builder.Build(identity, options, now, new QueueHealth(4, 1, now));
 
         Assert.Equal("agent.heartbeat", heartbeat.EventType);
         Assert.Equal("1.0", heartbeat.SchemaVersion);
@@ -22,5 +22,9 @@ public sealed class HeartbeatContractTests
         Assert.Equal("workstation-1", heartbeat.WorkstationId);
         Assert.Equal("tenant-a", heartbeat.TenantBinding);
         Assert.Equal("runtime.foundation", heartbeat.SourceAdapter);
+        Assert.Equal(4, heartbeat.QueuePendingCount);
+        Assert.Equal(1, heartbeat.QueueInFlightCount);
+        Assert.Equal("Operational", heartbeat.QueueStatus);
+        Assert.Equal("Running", heartbeat.ServiceState);
     }
 }

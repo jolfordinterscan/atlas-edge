@@ -107,7 +107,12 @@ public sealed class Worker : BackgroundService
 
     private async Task ProcessHeartbeatAsync(AgentIdentity identity, CancellationToken cancellationToken)
     {
-        var heartbeat = _heartbeatEventBuilder.Build(identity, _options, _timeProvider.GetUtcNow());
+        var queueBeforeHeartbeat = await _queue.GetHealthAsync(cancellationToken);
+        var heartbeat = _heartbeatEventBuilder.Build(
+            identity,
+            _options,
+            _timeProvider.GetUtcNow(),
+            queueBeforeHeartbeat);
         var receiptId = await _queue.EnqueueAsync(heartbeat, cancellationToken);
 
         _logger.LogInformation(
@@ -138,28 +143,19 @@ public sealed class Worker : BackgroundService
 
             if (rejectedReceipts.Length > 0)
             {
-                await _queue.RetryAsync(
-                    rejectedReceipts,
-                    _timeProvider.GetUtcNow().AddSeconds(5),
-                    cancellationToken);
+                await RetryAsync(batch, rejectedReceipts, cancellationToken);
             }
         }
         else if (result.FailureKind == TransportFailureKind.Retryable)
         {
-            await _queue.RetryAsync(
-                batch.Select(item => item.ReceiptId),
-                _timeProvider.GetUtcNow().AddSeconds(5),
-                cancellationToken);
+            await RetryAsync(batch, batch.Select(item => item.ReceiptId), cancellationToken);
 
             _runtimeState.Update(RuntimeStatus.Degraded, "Heartbeat delivery failed and is retryable.", result.Error);
             _logger.LogWarning("Retryable transport failure occurred: {Failure}", result.Error);
         }
         else if (result.FailureKind == TransportFailureKind.AuthenticationRequired)
         {
-            await _queue.RetryAsync(
-                batch.Select(item => item.ReceiptId),
-                _timeProvider.GetUtcNow().AddSeconds(5),
-                cancellationToken);
+            await RetryAsync(batch, batch.Select(item => item.ReceiptId), cancellationToken);
 
             _runtimeState.Update(RuntimeStatus.Degraded, "Authentication is required; telemetry remains queued.", result.Error);
             _logger.LogWarning("Authenticated transmission is paused with code {Failure}; telemetry remains queued.", result.Error);
@@ -182,6 +178,28 @@ public sealed class Worker : BackgroundService
             "Heartbeat cycle completed with queue pending count {PendingCount} and in-flight count {InFlightCount}.",
             queueHealth.PendingCount,
             queueHealth.InFlightCount);
+    }
+
+    private Task RetryAsync(
+        IReadOnlyList<QueueItem<AgentHeartbeatEvent>> batch,
+        IEnumerable<string> receiptIds,
+        CancellationToken cancellationToken)
+    {
+        var attempt = Math.Max(1, batch.Count == 0 ? 1 : batch.Max(item => item.AttemptCount));
+        return _queue.RetryAsync(
+            receiptIds,
+            _timeProvider.GetUtcNow() + GetQueueRetryDelay(
+                attempt,
+                _options.QueueRetryBaseSeconds,
+                _options.QueueRetryMaximumSeconds),
+            cancellationToken);
+    }
+
+    internal static TimeSpan GetQueueRetryDelay(int attempt, int baseSeconds, int maximumSeconds)
+    {
+        var exponent = Math.Min(Math.Max(1, attempt) - 1, 20);
+        var delaySeconds = Math.Min(maximumSeconds, baseSeconds * Math.Pow(2, exponent));
+        return TimeSpan.FromSeconds(delaySeconds);
     }
 
     private async Task<AgentIdentity?> EnsureIdentityAsync(CancellationToken cancellationToken)

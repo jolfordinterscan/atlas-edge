@@ -11,4 +11,13 @@ public sealed record AgentHeartbeatEvent(
     string TenantBinding,
     string SourceAdapter,
     string? CorrelationId,
-    string EnvironmentName);
+    string EnvironmentName)
+{
+    public int? QueuePendingCount { get; init; }
+
+    public int? QueueInFlightCount { get; init; }
+
+    public string? QueueStatus { get; init; }
+
+    public string? ServiceState { get; init; }
+}

@@ -9,7 +9,11 @@ public sealed class HeartbeatEventBuilder
     public const string SchemaVersion = "1.0";
     public const string SourceAdapter = "runtime.foundation";
 
-    public AgentHeartbeatEvent Build(AgentIdentity identity, AtlasEdgeOptions options, DateTimeOffset observedTimestampUtc)
+    public AgentHeartbeatEvent Build(
+        AgentIdentity identity,
+        AtlasEdgeOptions options,
+        DateTimeOffset observedTimestampUtc,
+        QueueHealth? queueHealth = null)
     {
         var utcObserved = observedTimestampUtc.ToUniversalTime();
 
@@ -24,6 +28,12 @@ public sealed class HeartbeatEventBuilder
             TenantBinding: identity.TenantBinding,
             SourceAdapter: SourceAdapter,
             CorrelationId: null,
-            EnvironmentName: options.EnvironmentName);
+            EnvironmentName: options.EnvironmentName)
+        {
+            QueuePendingCount = queueHealth?.PendingCount,
+            QueueInFlightCount = queueHealth?.InFlightCount,
+            QueueStatus = queueHealth is null ? null : "Operational",
+            ServiceState = "Running"
+        };
     }
 }

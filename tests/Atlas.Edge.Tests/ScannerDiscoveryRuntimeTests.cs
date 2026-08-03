@@ -101,6 +101,28 @@ public sealed class ScannerDiscoveryRuntimeTests
     }
 
     [Fact]
+    public async Task TransportMode_PeriodicallyReconcilesAnUnchangedAcceptedInventory()
+    {
+        var time = new ManualTimeProvider(
+            new DateTimeOffset(2026, 8, 2, 12, 0, 0, TimeSpan.Zero));
+        var transport = new RecordingTransport(TransportFailureKind.None);
+        var service = CreateHostedService(
+            new StaticDiscoveryService(CreateSnapshot("fi-8170")),
+            new ScannerInventoryState(),
+            new InMemoryEventQueue(),
+            AtlasEdgeOptions.ScannerInventoryPublishModeTransport,
+            transport,
+            time);
+
+        await service.RunCycleAsync(CancellationToken.None);
+        await service.RunCycleAsync(CancellationToken.None);
+        time.Advance(TimeSpan.FromDays(1));
+        await service.RunCycleAsync(CancellationToken.None);
+
+        Assert.Equal(2, transport.InventorySendCount);
+    }
+
+    [Fact]
     public async Task TransportMode_DropsPermanentInventoryRejectionWithoutTouchingHeartbeatQueue()
     {
         var queue = new InMemoryEventQueue();
@@ -126,7 +148,8 @@ public sealed class ScannerDiscoveryRuntimeTests
         ScannerInventoryState inventory,
         IEventQueue queue,
         string publishMode = AtlasEdgeOptions.ScannerInventoryPublishModeQueueOnly,
-        IEventTransport? transport = null)
+        IEventTransport? transport = null,
+        TimeProvider? timeProvider = null)
     {
         var identityState = new RuntimeIdentityState();
         identityState.Update(new AgentIdentity(
@@ -150,7 +173,7 @@ public sealed class ScannerDiscoveryRuntimeTests
             queue,
             transport ?? new NullEventTransport(NullLogger<NullEventTransport>.Instance),
             options,
-            TimeProvider.System,
+            timeProvider ?? TimeProvider.System,
             NullLogger<ScannerDiscoveryHostedService>.Instance);
     }
 

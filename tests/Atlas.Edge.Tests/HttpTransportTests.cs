@@ -46,8 +46,15 @@ public sealed class HttpTransportTests
             Assert.Equal("scanner.inventory", sent.GetProperty("eventType").GetString());
             Assert.Equal(inventory.InventoryVersion, sent.GetProperty("inventoryVersion").GetString());
             var scanner = sent.GetProperty("scanners")[0];
-            Assert.Equal("scanner-test", scanner.GetProperty("scannerId").GetString());
+            Assert.Equal("scanner-ca9cbc762608af46bece7e18", scanner.GetProperty("scannerId").GetString());
+            Assert.Equal("FUJITSU", scanner.GetProperty("driverProvider").GetString());
+            Assert.Equal("04C5", scanner.GetProperty("usbVendorId").GetString());
+            Assert.Equal("15FF", scanner.GetProperty("usbProductId").GetString());
+            Assert.Equal(new string('c', 64), scanner.GetProperty("containerId").GetString());
+            Assert.Equal(new string('b', 64), scanner.GetProperty("locationPathHash").GetString());
             Assert.False(scanner.TryGetProperty("devicePath", out var rawDevicePath));
+            Assert.False(scanner.TryGetProperty("deviceInstanceId", out var rawDeviceInstanceId));
+            Assert.Equal(JsonValueKind.Undefined, rawDeviceInstanceId.ValueKind);
             Assert.Equal(JsonValueKind.Undefined, rawDevicePath.ValueKind);
 
             return new HttpResponseMessage(HttpStatusCode.OK)
@@ -210,26 +217,18 @@ public sealed class HttpTransportTests
             null);
     }
 
-    private static ScannerInventoryEvent CreateInventory() =>
-        new(
-            "inventory-event",
-            "scanner.inventory",
-            "1.0",
-            DateTimeOffset.UtcNow,
-            "agent-1",
-            "device-1",
-            new string('a', 64),
-            1,
-            [new ScannerInventoryEntry(
-                "scanner-test",
+    private static ScannerInventoryEvent CreateInventory()
+    {
+        var entry = new ScannerInventoryEntry(
+                "scanner-ca9cbc762608af46bece7e18",
                 "wia",
                 "WIA",
                 "FUJITSU",
                 "fi-8170",
                 null,
-                "device-path-sha256",
-                null,
-                null,
+                new string('a', 64),
+                "fi-8170",
+                "2.0.0.9",
                 "Wia",
                 "Usb",
                 null,
@@ -238,8 +237,27 @@ public sealed class HttpTransportTests
                 ["Unknown"],
                 DateTimeOffset.UtcNow.AddMinutes(-1),
                 DateTimeOffset.UtcNow,
-                "StandardProtocol",
-                [])]);
+                "ProviderStableIdentity",
+                [])
+        {
+            DriverProvider = "FUJITSU",
+            UsbVendorId = "04C5",
+            UsbProductId = "15FF",
+            ContainerId = new string('c', 64),
+            LocationPathHash = new string('b', 64),
+            DeviceInstanceIdHash = new string('d', 64)
+        };
+        return new(
+            "inventory-event",
+            "scanner.inventory",
+            "1.0",
+            DateTimeOffset.UtcNow,
+            "agent-1",
+            "device-1",
+            new string('a', 64),
+            1,
+            [entry]);
+    }
 
     private sealed class StaticCredentialProvider : ITransportCredentialProvider
     {

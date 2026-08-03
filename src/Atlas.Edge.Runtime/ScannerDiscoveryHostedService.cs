@@ -17,6 +17,7 @@ public sealed class ScannerDiscoveryHostedService : BackgroundService
     private readonly IEventQueue _queue;
     private readonly IEventTransport _transport;
     private readonly TimeProvider _timeProvider;
+    private DateTimeOffset? _lastInventoryAcceptedUtc;
 
     public ScannerDiscoveryHostedService(
         IScannerDiscoveryService discoveryService,
@@ -138,8 +139,14 @@ public sealed class ScannerDiscoveryHostedService : BackgroundService
             return;
         }
 
+        var now = _timeProvider.GetUtcNow();
+        var reconciliationDue = transport &&
+            (_lastInventoryAcceptedUtc is null ||
+             now - _lastInventoryAcceptedUtc >= TimeSpan.FromSeconds(
+                 _options.ScannerInventoryReconciliationIntervalSeconds));
         var enqueueResult = await _queue.EnqueueInventoryAsync(
             _eventBuilder.Build(snapshot, identity),
+            reconciliationDue,
             cancellationToken);
         _logger.LogInformation(enqueueResult.WasQueued
             ? "Scanner inventory changed; queued local inventory event."
@@ -160,6 +167,7 @@ public sealed class ScannerDiscoveryHostedService : BackgroundService
         if (sendResult.IsSuccess && sendResult.AcceptedEventIds.Contains(pending.EventId))
         {
             await _queue.AcknowledgeInventoryAsync(pending.EventId, cancellationToken);
+            _lastInventoryAcceptedUtc = now;
             _logger.LogInformation("Scanner inventory event was accepted by Atlas.");
         }
         else if (sendResult.FailureKind == TransportFailureKind.NonRetryable)

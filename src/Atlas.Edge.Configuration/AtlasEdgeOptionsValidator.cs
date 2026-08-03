@@ -123,6 +123,17 @@ public sealed class AtlasEdgeOptionsValidator : IValidateOptions<AtlasEdgeOption
             errors.Add("QueueBatchSize must be greater than zero.");
         }
 
+        if (!string.IsNullOrWhiteSpace(options.EventQueueStorePath) &&
+            !Path.IsPathFullyQualified(options.EventQueueStorePath))
+        {
+            errors.Add("EventQueueStorePath must be an absolute path when configured.");
+        }
+
+        if (options.QueueRetryMaximumSeconds < options.QueueRetryBaseSeconds)
+        {
+            errors.Add("QueueRetryMaximumSeconds must be greater than or equal to QueueRetryBaseSeconds.");
+        }
+
         if (!string.Equals(
                 options.ScannerDiscoveryProvider,
                 AtlasEdgeOptions.ScannerDiscoveryProviderPlatform,

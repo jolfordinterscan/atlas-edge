@@ -10,6 +10,11 @@ public interface IEventQueue
         ScannerInventoryEvent inventoryEvent,
         CancellationToken cancellationToken);
 
+    Task<ScannerInventoryEnqueueResult> EnqueueInventoryAsync(
+        ScannerInventoryEvent inventoryEvent,
+        bool forceReconciliation,
+        CancellationToken cancellationToken);
+
     Task<ScannerInventoryEvent?> GetLatestInventoryAsync(CancellationToken cancellationToken);
 
     Task AcknowledgeInventoryAsync(string eventId, CancellationToken cancellationToken);

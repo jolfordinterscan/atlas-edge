@@ -63,6 +63,20 @@ public sealed class AtlasEdgeOptions
     [Range(1, 1000)]
     public int QueueBatchSize { get; set; } = 10;
 
+    public string? EventQueueStorePath { get; set; }
+
+    [Range(100, 100000)]
+    public int QueueMaximumPendingEvents { get; set; } = 10000;
+
+    [Range(1, 8760)]
+    public int QueueRetentionHours { get; set; } = 168;
+
+    [Range(1, 300)]
+    public int QueueRetryBaseSeconds { get; set; } = 5;
+
+    [Range(1, 3600)]
+    public int QueueRetryMaximumSeconds { get; set; } = 300;
+
     public bool ScannerDiscoveryEnabled { get; set; } = true;
 
     [Required]
@@ -81,6 +95,9 @@ public sealed class AtlasEdgeOptions
 
     [Required]
     public string ScannerInventoryPublishMode { get; set; } = ScannerInventoryPublishModeQueueOnly;
+
+    [Range(3600, 604800)]
+    public int ScannerInventoryReconciliationIntervalSeconds { get; set; } = 86400;
 
     public bool ScannerHealthEnabled { get; set; } = true;
 
