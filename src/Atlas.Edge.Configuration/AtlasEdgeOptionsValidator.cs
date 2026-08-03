@@ -106,13 +106,6 @@ public sealed class AtlasEdgeOptionsValidator : IValidateOptions<AtlasEdgeOption
             errors.Add("TransportMode must be either Null or Http.");
         }
 
-        if (isHttpTransport &&
-            string.IsNullOrWhiteSpace(options.CredentialStorePath) &&
-            OperatingSystem.IsWindows())
-        {
-            errors.Add("CredentialStorePath is required for development-mode HTTP transport on Windows until protected store is implemented.");
-        }
-
         if (string.IsNullOrWhiteSpace(options.SiteTimezone))
         {
             errors.Add("SiteTimezone is required.");

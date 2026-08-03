@@ -15,6 +15,18 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 var builder = Host.CreateApplicationBuilder(args);
 
+var machineConfigurationPath = Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+    "InterScan",
+    "Atlas Edge",
+    "configuration",
+    "appsettings.json");
+
+builder.Configuration.AddJsonFile(
+    machineConfigurationPath,
+    optional: true,
+    reloadOnChange: true);
+
 builder.Configuration.AddEnvironmentVariables(prefix: "ATLAS_EDGE_");
 
 var optionsSectionPath = AtlasEdgeOptions.SectionName;

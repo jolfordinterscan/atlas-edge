@@ -1,10 +1,12 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
+using System.Runtime.Versioning;
 using System.Text.Json;
 using Atlas.Edge.Configuration;
 using Microsoft.Extensions.Options;
 
 namespace Atlas.Edge.Security;
 
+[SupportedOSPlatform("windows")]
 public sealed class WindowsProtectedCredentialStore : ICredentialStore
 {
     private static readonly JsonSerializerOptions SerializerOptions =
