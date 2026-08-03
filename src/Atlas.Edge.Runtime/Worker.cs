@@ -291,6 +291,11 @@ public sealed class Worker : BackgroundService
         _transportCredentialProvider.Initialize(credentials);
         await ClearEnrollmentCodeAsync(cancellationToken);
 
+        if (OperatingSystem.IsWindows())
+        {
+            WindowsMachineEnrollmentConfiguration.ClearEnrollmentCode();
+        }
+
         _logger.LogInformation(
             "Enrollment succeeded for agent {AgentId}; site timezone {SiteTimezone}; token fingerprint {TokenFingerprint}.",
             response.AgentId,

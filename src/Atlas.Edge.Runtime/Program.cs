@@ -27,6 +27,12 @@ builder.Configuration.AddJsonFile(
     optional: true,
     reloadOnChange: true);
 
+if (OperatingSystem.IsWindows())
+{
+    builder.Configuration.AddInMemoryCollection(
+        WindowsMachineEnrollmentConfiguration.Load());
+}
+
 builder.Configuration.AddEnvironmentVariables(prefix: "ATLAS_EDGE_");
 
 var optionsSectionPath = AtlasEdgeOptions.SectionName;
