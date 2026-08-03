@@ -209,7 +209,7 @@ builder.Services.AddSingleton<MissionControlApplicationService>();
 
 if (OperatingSystem.IsWindows())
 {
-    builder.Services.AddSingleton<ICredentialStore, WindowsCredentialStorePlaceholder>();
+    builder.Services.AddSingleton<ICredentialStore, WindowsProtectedCredentialStore>();
 }
 else
 {

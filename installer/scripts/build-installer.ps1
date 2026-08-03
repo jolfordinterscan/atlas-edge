@@ -85,7 +85,7 @@ if ($LASTEXITCODE -ne 0) { throw 'MSI build failed.' }
 
 $builtMsi = Get-ChildItem -LiteralPath $stagingRoot -Filter '*.msi' -Recurse | Select-Object -First 1
 if ($null -eq $builtMsi) { throw 'WiX completed without producing an MSI.' }
-Copy-Item -LiteralPath $builtMsi.FullName -Destination $msiOutput -Force
+if ([System.IO.Path]::GetFullPath($builtMsi.FullName) -ne [System.IO.Path]::GetFullPath($msiOutput)) { Copy-Item -LiteralPath $builtMsi.FullName -Destination $msiOutput -Force }
 
 if ($Sign) {
     & signtool sign /fd SHA256 /f $env:ATLAS_EDGE_SIGN_CERTIFICATE_PATH `
