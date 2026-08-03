@@ -21,7 +21,7 @@ var optionsSectionPath = AtlasEdgeOptions.SectionName;
 var enrollmentUrlValue = builder.Configuration[$"{optionsSectionPath}:EnrollmentUrl"];
 if (!Uri.TryCreate(enrollmentUrlValue, UriKind.Absolute, out var enrollmentUrl))
 {
-    enrollmentUrl = new Uri("https://staging.atlas.interscan.com/");
+    enrollmentUrl = new Uri("https://atlas-web-staging-732a.up.railway.app/");
 }
 
 var httpTimeoutSecondsValue = builder.Configuration[$"{optionsSectionPath}:HttpTimeoutSeconds"];

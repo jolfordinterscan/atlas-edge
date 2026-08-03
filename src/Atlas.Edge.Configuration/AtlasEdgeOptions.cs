@@ -25,10 +25,10 @@ public sealed class AtlasEdgeOptions
 
     public string TenantBinding { get; set; } = "tenant-placeholder";
 
-    public string IngestionUrl { get; set; } = "https://staging.atlas.interscan.com/";
+    public string IngestionUrl { get; set; } = "https://atlas-web-staging-732a.up.railway.app/";
 
     [Required]
-    public string EnrollmentUrl { get; set; } = "https://staging.atlas.interscan.com/";
+    public string EnrollmentUrl { get; set; } = "https://atlas-web-staging-732a.up.railway.app/";
 
     public string EnrollmentCode { get; set; } = string.Empty;
 
