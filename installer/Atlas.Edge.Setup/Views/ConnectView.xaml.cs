@@ -16,4 +16,9 @@ public partial class ConnectView : UserControl
 
     public string EnrollmentCode =>
         EnrollmentCodeBox.Password.Trim();
+
+    public void ClearEnrollmentCode()
+    {
+        EnrollmentCodeBox.Clear();
+    }
 }
