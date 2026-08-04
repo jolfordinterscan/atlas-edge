@@ -289,7 +289,8 @@
                                Margin="0,18,0,0"
                                Text="Ready to install."
                                Foreground="{StaticResource AtlasMuted}"
-                               FontSize="13" />
+                               FontSize="13"
+                               TextWrapping="Wrap" />
                 </StackPanel>
 
                 <StackPanel x:Name="VerifyPanel"
@@ -303,7 +304,7 @@
                                FontWeight="SemiBold" />
 
                     <TextBlock Margin="0,18,0,28"
-                               Text="We will verify the Windows service, Atlas enrollment, heartbeat, and scanner inventory."
+                               Text="We will verify the Windows service, protected credentials, and secure enrollment handoff."
                                TextWrapping="Wrap"
                                Foreground="{StaticResource AtlasMuted}"
                                FontSize="16" />
@@ -313,23 +314,35 @@
                             BorderThickness="1"
                             CornerRadius="10"
                             Padding="20">
+
                         <StackPanel>
-                            <TextBlock Text="○ Windows service"
-                                       Margin="0,0,0,12"
+                            <TextBlock x:Name="VerifyServiceStatus"
+                                       Text="○ Windows service"
+                                       Margin="0,0,0,14"
                                        FontSize="14" />
 
-                            <TextBlock Text="○ Atlas enrollment"
-                                       Margin="0,0,0,12"
+                            <TextBlock x:Name="VerifyCredentialsStatus"
+                                       Text="○ Protected credentials"
+                                       Margin="0,0,0,14"
                                        FontSize="14" />
 
-                            <TextBlock Text="○ Heartbeat"
-                                       Margin="0,0,0,12"
+                            <TextBlock x:Name="VerifyTokenStatus"
+                                       Text="○ Enrollment token removed"
+                                       Margin="0,0,0,14"
                                        FontSize="14" />
 
-                            <TextBlock Text="○ Scanner inventory"
+                            <TextBlock x:Name="VerifyOverallStatus"
+                                       Text="○ Atlas Edge readiness"
                                        FontSize="14" />
                         </StackPanel>
                     </Border>
+
+                    <TextBlock x:Name="VerifyDetailText"
+                               Margin="0,18,0,0"
+                               Text="Ready to verify."
+                               Foreground="{StaticResource AtlasMuted}"
+                               FontSize="13"
+                               TextWrapping="Wrap" />
                 </StackPanel>
 
                 <StackPanel x:Name="CompletePanel"
@@ -357,7 +370,8 @@
                                FontWeight="SemiBold" />
 
                     <TextBlock Margin="0,18,0,0"
-                               Text="This computer is ready to connect to Atlas."
+                               Text="This computer has completed local Atlas Edge verification."
+                               TextWrapping="Wrap"
                                Foreground="{StaticResource AtlasMuted}"
                                FontSize="16" />
                 </StackPanel>

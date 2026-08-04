@@ -1,13 +1,17 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using Atlas.Edge.Setup.Services;
 
 namespace Atlas.Edge.Setup;
 
 public partial class MainWindow : Window
 {
+    private readonly InstallerService _installerService = new();
     private readonly TextBlock[] _stepLabels;
+
     private int _stepIndex;
 
     public MainWindow()
@@ -66,53 +70,131 @@ public partial class MainWindow : Window
 
         ResetInstallationStatus();
 
-        await UpdateInstallStepAsync(
-            RuntimeInstallStatus,
-            "Runtime files",
-            25,
-            "Installing Atlas Edge runtime...");
+        RuntimeInstallStatus.Text = "● Runtime files";
+        RuntimeInstallStatus.Foreground = CreateBrush("#2563EB");
+        InstallDetailText.Text = "Locating the Atlas Edge installer...";
 
-        await UpdateInstallStepAsync(
-            ServiceInstallStatus,
-            "Windows service",
-            50,
-            "Registering the Atlas Edge Windows service...");
+        var repositoryRoot = FindRepositoryRoot();
 
-        await UpdateInstallStepAsync(
-            ConfigurationInstallStatus,
-            "Enrollment configuration",
-            75,
-            "Preparing secure Atlas enrollment...");
+        if (repositoryRoot is null)
+        {
+            ShowInstallationFailure(
+                "Could not locate the Atlas Edge repository.");
 
-        await UpdateInstallStepAsync(
-            StartupInstallStatus,
-            "Starting Atlas Edge",
-            100,
-            "Starting the Atlas Edge runtime...");
+            return;
+        }
 
+        var msiPath = Path.Combine(
+            repositoryRoot,
+            "artifacts",
+            "installer",
+            "staging",
+            "AtlasEdge.msi");
+
+        var logPath = Path.Combine(
+            Environment.GetFolderPath(
+                Environment.SpecialFolder.CommonApplicationData),
+            "InterScan",
+            "Atlas Edge",
+            "diagnostics",
+            "installer.log");
+
+        if (!File.Exists(msiPath))
+        {
+            ShowInstallationFailure(
+                $"AtlasEdge.msi was not found at:{Environment.NewLine}{msiPath}");
+
+            return;
+        }
+
+        RuntimeInstallStatus.Text = "✓ Runtime files";
+        RuntimeInstallStatus.Foreground = CreateBrush("#159455");
+        InstallProgressBar.Value = 25;
+
+        ServiceInstallStatus.Text = "● Windows service";
+        ServiceInstallStatus.Foreground = CreateBrush("#2563EB");
         InstallDetailText.Text =
-            "Installation completed successfully.";
+            "Installing Atlas Edge with Windows Installer...";
+
+        var result = await _installerService.InstallAsync(
+            msiPath,
+            logPath);
+
+        if (!result.Succeeded)
+        {
+            var errorMessage =
+                result.Error ?? "Atlas Edge installation failed.";
+
+            if (result.ExitCode is not null)
+            {
+                errorMessage +=
+                    $"{Environment.NewLine}Windows Installer exit code: {result.ExitCode}";
+            }
+
+            ShowInstallationFailure(errorMessage);
+            return;
+        }
+
+        ServiceInstallStatus.Text = "✓ Windows service";
+        ServiceInstallStatus.Foreground = CreateBrush("#159455");
+        InstallProgressBar.Value = 50;
+
+        ConfigurationInstallStatus.Text =
+            "✓ Enrollment configuration";
+        ConfigurationInstallStatus.Foreground =
+            CreateBrush("#159455");
+        InstallProgressBar.Value = 75;
+
+        StartupInstallStatus.Text = "● Starting Atlas Edge";
+        StartupInstallStatus.Foreground = CreateBrush("#2563EB");
+        InstallDetailText.Text =
+            "Confirming the Atlas Edge service is running...";
+
+        await Task.Delay(500);
+
+        StartupInstallStatus.Text = "✓ Starting Atlas Edge";
+        StartupInstallStatus.Foreground = CreateBrush("#159455");
+        InstallProgressBar.Value = 100;
+
+        InstallDetailText.Text = result.RestartRequired
+            ? "Installation completed. Windows requested a restart."
+            : "Installation completed successfully.";
 
         await Task.Delay(700);
 
         ShowStep(3);
     }
 
-    private async Task UpdateInstallStepAsync(
-        TextBlock statusText,
-        string label,
-        double progress,
-        string detail)
+    private static string? FindRepositoryRoot()
     {
-        statusText.Text = $"● {label}";
-        statusText.Foreground = CreateBrush("#2563EB");
-        InstallDetailText.Text = detail;
+        var directory = new DirectoryInfo(
+            AppContext.BaseDirectory);
 
-        await Task.Delay(900);
+        while (directory is not null)
+        {
+            var solutionPath = Path.Combine(
+                directory.FullName,
+                "Atlas.Edge.sln");
 
-        statusText.Text = $"✓ {label}";
-        statusText.Foreground = CreateBrush("#159455");
-        InstallProgressBar.Value = progress;
+            if (File.Exists(solutionPath))
+            {
+                return directory.FullName;
+            }
+
+            directory = directory.Parent;
+        }
+
+        return null;
+    }
+
+    private void ShowInstallationFailure(string message)
+    {
+        InstallDetailText.Text = message;
+        InstallDetailText.Foreground = CreateBrush("#D92D20");
+
+        NextButton.Content = "Try Again";
+        NextButton.IsEnabled = true;
+        BackButton.IsEnabled = true;
     }
 
     private void ResetInstallationStatus()
@@ -135,6 +217,8 @@ public partial class MainWindow : Window
             CreateBrush("#182033");
 
         InstallDetailText.Text = "Preparing installation...";
+        InstallDetailText.Foreground =
+            CreateBrush("#667085");
     }
 
     private void ShowStep(int stepIndex)
