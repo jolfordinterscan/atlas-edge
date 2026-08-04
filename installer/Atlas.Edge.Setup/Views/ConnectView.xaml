@@ -1,0 +1,57 @@
+﻿<UserControl x:Class="Atlas.Edge.Setup.Views.ConnectView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <StackPanel VerticalAlignment="Center"
+                MaxWidth="570">
+
+        <TextBlock Text="Connect to Atlas"
+                   Foreground="#182033"
+                   FontSize="34"
+                   FontWeight="SemiBold" />
+
+        <TextBlock Margin="0,18,0,28"
+                   Text="Enter the Atlas enrollment details for this computer."
+                   TextWrapping="Wrap"
+                   Foreground="#667085"
+                   FontSize="16" />
+
+        <TextBlock Text="Atlas server"
+                   Foreground="#667085"
+                   FontSize="13" />
+
+        <TextBox x:Name="AtlasServerTextBox"
+                 Margin="0,8,0,20"
+                 Height="40"
+                 Padding="10,8"
+                 Text="https://atlas-web-staging-732a.up.railway.app/" />
+
+        <TextBlock Text="Enrollment code"
+                   Foreground="#667085"
+                   FontSize="13" />
+
+        <PasswordBox x:Name="EnrollmentCodeBox"
+                     Margin="0,8,0,20"
+                     Height="40"
+                     Padding="10,8" />
+
+        <Border Background="White"
+                BorderBrush="#E2E7F0"
+                BorderThickness="1"
+                CornerRadius="10"
+                Padding="18">
+
+            <StackPanel>
+                <TextBlock Text="Computer"
+                           Foreground="#667085"
+                           FontSize="12" />
+
+                <TextBlock x:Name="ComputerNameText"
+                           Margin="0,4,0,0"
+                           Foreground="#182033"
+                           FontSize="15"
+                           FontWeight="SemiBold" />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

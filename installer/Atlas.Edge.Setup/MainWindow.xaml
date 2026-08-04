@@ -62,32 +62,32 @@
                             Margin="0,70,0,0">
 
                     <TextBlock x:Name="WelcomeStep"
-                               Text="●  Welcome"
+                               Text="â—  Welcome"
                                Foreground="White"
                                FontSize="15"
                                FontWeight="SemiBold"
                                Margin="0,0,0,22" />
 
                     <TextBlock x:Name="ConnectStep"
-                               Text="○  Connect to Atlas"
+                               Text="â—‹  Connect to Atlas"
                                Foreground="#92A2BE"
                                FontSize="15"
                                Margin="0,0,0,22" />
 
                     <TextBlock x:Name="InstallStep"
-                               Text="○  Install"
+                               Text="â—‹  Install"
                                Foreground="#92A2BE"
                                FontSize="15"
                                Margin="0,0,0,22" />
 
                     <TextBlock x:Name="VerifyStep"
-                               Text="○  Verify"
+                               Text="â—‹  Verify"
                                Foreground="#92A2BE"
                                FontSize="15"
                                Margin="0,0,0,22" />
 
                     <TextBlock x:Name="CompleteStep"
-                               Text="○  Complete"
+                               Text="â—‹  Complete"
                                Foreground="#92A2BE"
                                FontSize="15" />
                 </StackPanel>
@@ -110,60 +110,7 @@
             <Grid>
                 <views:WelcomeView x:Name="WelcomePanel" />
 
-                <StackPanel x:Name="ConnectPanel"
-                            Visibility="Collapsed"
-                            VerticalAlignment="Center"
-                            MaxWidth="570">
-
-                    <TextBlock Text="Connect to Atlas"
-                               Foreground="{StaticResource AtlasText}"
-                               FontSize="34"
-                               FontWeight="SemiBold" />
-
-                    <TextBlock Margin="0,18,0,28"
-                               Text="Enter the Atlas enrollment details for this computer."
-                               TextWrapping="Wrap"
-                               Foreground="{StaticResource AtlasMuted}"
-                               FontSize="16" />
-
-                    <TextBlock Text="Atlas server"
-                               Foreground="{StaticResource AtlasMuted}"
-                               FontSize="13" />
-
-                    <TextBox x:Name="AtlasServerTextBox"
-                             Margin="0,8,0,20"
-                             Height="40"
-                             Padding="10,8"
-                             Text="https://atlas-web-staging-732a.up.railway.app/" />
-
-                    <TextBlock Text="Enrollment code"
-                               Foreground="{StaticResource AtlasMuted}"
-                               FontSize="13" />
-
-                    <PasswordBox x:Name="EnrollmentCodeBox"
-                                 Margin="0,8,0,20"
-                                 Height="40"
-                                 Padding="10,8" />
-
-                    <Border Background="White"
-                            BorderBrush="#E2E7F0"
-                            BorderThickness="1"
-                            CornerRadius="10"
-                            Padding="18">
-                        <StackPanel>
-                            <TextBlock Text="Computer"
-                                       Foreground="{StaticResource AtlasMuted}"
-                                       FontSize="12" />
-
-                            <TextBlock x:Name="ConnectComputerNameText"
-                                       Margin="0,4,0,0"
-                                       Foreground="{StaticResource AtlasText}"
-                                       FontSize="15"
-                                       FontWeight="SemiBold" />
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-
+                <views:ConnectView x:Name="ConnectPanel" />
                 <StackPanel x:Name="InstallPanel"
                             Visibility="Collapsed"
                             VerticalAlignment="Center"
@@ -195,22 +142,22 @@
 
                         <StackPanel>
                             <TextBlock x:Name="RuntimeInstallStatus"
-                                       Text="○ Runtime files"
+                                       Text="â—‹ Runtime files"
                                        Margin="0,0,0,16"
                                        FontSize="14" />
 
                             <TextBlock x:Name="ServiceInstallStatus"
-                                       Text="○ Windows service"
+                                       Text="â—‹ Windows service"
                                        Margin="0,0,0,16"
                                        FontSize="14" />
 
                             <TextBlock x:Name="ConfigurationInstallStatus"
-                                       Text="○ Enrollment configuration"
+                                       Text="â—‹ Enrollment configuration"
                                        Margin="0,0,0,16"
                                        FontSize="14" />
 
                             <TextBlock x:Name="StartupInstallStatus"
-                                       Text="○ Starting Atlas Edge"
+                                       Text="â—‹ Starting Atlas Edge"
                                        FontSize="14" />
                         </StackPanel>
                     </Border>
@@ -247,22 +194,22 @@
 
                         <StackPanel>
                             <TextBlock x:Name="VerifyServiceStatus"
-                                       Text="○ Windows service"
+                                       Text="â—‹ Windows service"
                                        Margin="0,0,0,14"
                                        FontSize="14" />
 
                             <TextBlock x:Name="VerifyCredentialsStatus"
-                                       Text="○ Protected credentials"
+                                       Text="â—‹ Protected credentials"
                                        Margin="0,0,0,14"
                                        FontSize="14" />
 
                             <TextBlock x:Name="VerifyTokenStatus"
-                                       Text="○ Enrollment token removed"
+                                       Text="â—‹ Enrollment token removed"
                                        Margin="0,0,0,14"
                                        FontSize="14" />
 
                             <TextBlock x:Name="VerifyOverallStatus"
-                                       Text="○ Atlas Edge readiness"
+                                       Text="â—‹ Atlas Edge readiness"
                                        FontSize="14" />
                         </StackPanel>
                     </Border>
@@ -286,7 +233,7 @@
                             CornerRadius="33"
                             Background="#E8F7EE"
                             Margin="0,0,0,28">
-                        <TextBlock Text="✓"
+                        <TextBlock Text="âœ“"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
                                    Foreground="#159455"
