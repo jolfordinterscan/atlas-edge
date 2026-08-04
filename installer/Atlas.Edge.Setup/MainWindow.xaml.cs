@@ -1,5 +1,4 @@
 ﻿using System.IO;
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -18,12 +17,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
-        var computerName = Environment.MachineName;
-
-        ComputerNameText.Text = computerName;
-        ConnectComputerNameText.Text = computerName;
-        OperatingSystemText.Text =
-            $"{RuntimeInformation.OSDescription} ({RuntimeInformation.OSArchitecture})";
+        ConnectComputerNameText.Text = Environment.MachineName;
 
         _stepLabels =
         [

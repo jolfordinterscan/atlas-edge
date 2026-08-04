@@ -1,0 +1,76 @@
+<UserControl x:Class="Atlas.Edge.Setup.Views.WelcomeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <StackPanel VerticalAlignment="Center"
+                MaxWidth="570">
+
+        <Border Width="66"
+                Height="66"
+                HorizontalAlignment="Left"
+                CornerRadius="14"
+                Background="#E8EFFF"
+                Margin="0,0,0,28">
+            <TextBlock Text="A"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Foreground="#2563EB"
+                       FontSize="30"
+                       FontWeight="Bold" />
+        </Border>
+
+        <TextBlock Text="Welcome to Atlas Edge"
+                   Foreground="#182033"
+                   FontSize="34"
+                   FontWeight="SemiBold" />
+
+        <TextBlock Margin="0,18,0,32"
+                   Text="This setup will install Atlas Edge and securely connect this computer to your InterScan Atlas fleet."
+                   TextWrapping="Wrap"
+                   Foreground="#667085"
+                   FontSize="16"
+                   LineHeight="25" />
+
+        <Border Background="White"
+                BorderBrush="#E2E7F0"
+                BorderThickness="1"
+                CornerRadius="10"
+                Padding="22">
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="14" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="Computer"
+                           Foreground="#667085"
+                           FontSize="13" />
+
+                <TextBlock x:Name="ComputerNameText"
+                           Grid.Column="1"
+                           Foreground="#182033"
+                           FontSize="14"
+                           FontWeight="SemiBold" />
+
+                <TextBlock Grid.Row="2"
+                           Text="Operating system"
+                           Foreground="#667085"
+                           FontSize="13" />
+
+                <TextBlock x:Name="OperatingSystemText"
+                           Grid.Row="2"
+                           Grid.Column="1"
+                           Foreground="#182033"
+                           FontSize="14"
+                           FontWeight="SemiBold" />
+            </Grid>
+        </Border>
+    </StackPanel>
+</UserControl>
